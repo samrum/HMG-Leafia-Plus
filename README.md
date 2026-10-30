@@ -27,6 +27,7 @@ Firmware differs between models, regions and versions, so whole-file checksums r
 | Turn-by-turn | Projection navigation on the cluster and HUD | Rebuilt on the unit from its stock apps (`patches/<car>`). Uses only the standard cluster calls, so cars without a HUD are fine. The installer refuses if the firmware lacks any call it needs. |
 | CarPlay auto-open (Ioniq 5 US only) | Switches the screen to CarPlay about 1.5 s after a CarPlay session starts, the same switch as the "Open Apple CarPlay" widget; skipped if CarPlay is already on screen | Part of the CarPlay bridge build (`patches/neev`) |
 | Mute pauses CarPlay (Ioniq 5 US only) | The steering-wheel mute key also pauses CarPlay audio, and unmute resumes it; only when CarPlay is the audio source, not during CarPlay calls or Siri. The car's own mute is unchanged. | Part of the CarPlay bridge build (`patches/neev`) |
+| CarPlay steering-wheel buttons (Ioniq 5 US only) | With no call going, the Call key is CarPlay Back, and holding it opens CarPlay Maps; answering and hanging up calls are unchanged. The Favorite key, when set to Phone Projection, opens CarPlay on its home screen. | Part of the CarPlay bridge build (`patches/neev`) |
 
 Cars without a patch set yet get **basic mode**: only the wireless projection part, which gives wireless Android Auto on any Gen5W unit with a Wi-Fi module. The installer also saves a report so a full build can be made for that car.
 

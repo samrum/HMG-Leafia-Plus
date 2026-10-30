@@ -8,6 +8,10 @@ Features:
              (switch to CarPlay about 1.5 s after a CarPlay session starts)
   mute       v.onAllKeyForService -> LeafiaMuteKey.onKey
              (mute key pauses CarPlay audio, unmute resumes it)
+  call-key   v.onAllKeyForService -> LeafiaButtons.onCallKey
+             (Call key with no call: press = CarPlay Back, hold = Maps)
+  favorite-home  w.onReceive (ACTION_SHORTCUT_DIPO_CUSTOM) -> LeafiaButtons.onFavorite
+             (Favorite set to Phone Projection also sends CarPlay Home)
 
 Each hook is inserted at one anchor in stock code that must occur exactly once
 in its method, so an unexpected tree stops the build instead of patching the
@@ -33,6 +37,25 @@ HOOKS = {
         '    .registers 14\n',
         '\n    iget-object v0, p0, Lcom/daudio/app/dipo/service/v;->R:' + SVC + '\n'
         '\n    invoke-static {v0, p1, p2, p4, p7}, Lcom/daudio/app/dipo/service/LeafiaMuteKey;->onKey(' + SVC + 'IIII)V\n',
+    ),
+    'call-key': (
+        'com/daudio/app/dipo/service/v.smali',
+        '.method public final onAllKeyForService(IIIIIIIZ)V',
+        '    .registers 14\n',
+        '\n    iget-object v0, p0, Lcom/daudio/app/dipo/service/v;->R:' + SVC + '\n'
+        '\n    invoke-static {v0, p1, p2, p4, p7}, Lcom/daudio/app/dipo/service/LeafiaButtons;->onCallKey(' + SVC + 'IIII)Z\n'
+        '\n    move-result v0\n'
+        '\n    if-eqz v0, :leafia_call_stock\n'
+        '\n    return-void\n'
+        '\n    :leafia_call_stock\n',
+    ),
+    # stock: ... if (DipoActivity in front) return; Z(CarPlayMode)
+    'favorite-home': (
+        'com/daudio/app/dipo/service/w.smali',
+        '.method public final onReceive(Landroid/content/Context;Landroid/content/Intent;)V',
+        '    :cond_b7f\n',
+        '\n    iget-object v0, p0, Lcom/daudio/app/dipo/service/w;->R:' + SVC + '\n'
+        '\n    invoke-static {v0}, Lcom/daudio/app/dipo/service/LeafiaButtons;->onFavorite(' + SVC + ')V\n',
     ),
 }
 
