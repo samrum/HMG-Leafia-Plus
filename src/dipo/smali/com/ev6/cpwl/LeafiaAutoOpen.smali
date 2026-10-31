@@ -10,8 +10,6 @@
 #   step 1, 2.5 s after the switch, if Home hasn't been sent: Home if
 #     CarPlay is on screen, or else switch once more.
 #   step 2, 2.5 s after the retry: Home if CarPlay is on screen, then stop.
-#   step 4, 0.7 s after Home: Play, so playback resumes even when Home came
-#     before the phone started it.
 
 # interfaces
 .implements Ljava/lang/Runnable;
@@ -102,12 +100,6 @@
 
     invoke-virtual {p0, v1, v3, v3}, Lcom/daudio/app/dipo/service/DipoService;->a(Lcom/daudio/app/dipo/telechips/CarPlayConsumer;ZI)V
 
-    const/4 v1, 0x4
-
-    const-wide/16 v2, 0x2bc
-
-    invoke-static {p0, v1, v2, v3}, Lcom/ev6/cpwl/LeafiaAutoOpen;->post(Lcom/daudio/app/dipo/service/DipoService;IJ)V
-
     return-void
 .end method
 
@@ -161,33 +153,6 @@
 
     iget v3, p0, Lcom/ev6/cpwl/LeafiaAutoOpen;->step:I
 
-    const/4 v2, 0x4
-
-    if-ne v3, v2, :cond_not_play
-
-    invoke-virtual {v1}, Lcom/daudio/app/dipo/service/DipoService;->er()Z
-
-    move-result v2
-
-    if-eqz v2, :cond_done
-
-    const-string v2, "Leafia: auto-open resume, Play"
-
-    invoke-static {v0, v2}, Landroid/util/Log;->i(Ljava/lang/String;Ljava/lang/String;)I
-
-    sget-object v2, Lcom/daudio/app/dipo/telechips/CarPlayConsumer;->Play:Lcom/daudio/app/dipo/telechips/CarPlayConsumer;
-
-    const/4 v4, 0x1
-
-    const/4 v5, 0x0
-
-    invoke-virtual {v1, v2, v4, v5}, Lcom/daudio/app/dipo/service/DipoService;->a(Lcom/daudio/app/dipo/telechips/CarPlayConsumer;ZI)V
-
-    invoke-virtual {v1, v2, v5, v5}, Lcom/daudio/app/dipo/service/DipoService;->a(Lcom/daudio/app/dipo/telechips/CarPlayConsumer;ZI)V
-
-    return-void
-
-    :cond_not_play
     if-eqz v3, :cond_active_check
 
     # steps 1-3 only while Home is still pending
