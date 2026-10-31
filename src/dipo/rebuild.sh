@@ -16,7 +16,7 @@
 # on every run, and the .lpd must be reproducible.
 set -e
 BASE_REF=${BASE_REF:-08f4436}
-FEATURES="auto-open auto-open-home mute call-key favorite-home"
+FEATURES="hid-home-back auto-open auto-open-home mute call-key favorite-home"
 SET=$1 ODEX=$2 CHECK=$3
 [ -n "$SET" ] && [ -f "$ODEX" ] || { sed -n '2,13p' "$0"; exit 1; }
 HERE=$(cd "$(dirname "$0")" && pwd)

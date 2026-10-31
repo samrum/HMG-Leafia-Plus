@@ -13,7 +13,10 @@ Features:
   call-key   v.onAllKeyForService -> LeafiaButtons.onCallKey
              (Call key with no call: press = CarPlay Back, hold = Maps)
   favorite-home  w.onReceive (ACTION_SHORTCUT_DIPO_CUSTOM) -> LeafiaButtons.onFavorite
-             (Favorite set to Phone Projection also sends CarPlay Home)
+             (Favorite set to Phone Projection opens CarPlay on Home)
+  hid-home-back  e.b.l() createCarPlay arguments
+             (the car's CarPlay buttons include Home and Back, so the phone
+             accepts them; needed by auto-open-home, call-key, favorite-home)
 
 Each hook is inserted at one anchor in stock code that must occur exactly once
 in its method, so an unexpected tree stops the build instead of patching the
@@ -57,13 +60,23 @@ HOOKS = {
         '\n    return-void\n'
         '\n    :leafia_call_stock\n',
     ),
-    # stock: ... if (DipoActivity in front) return; Z(CarPlayMode)
+    # stock: ... if (DipoActivity in front) return; Z(CarPlayMode). On screen,
+    # LeafiaButtons.onCallKey handles the key itself.
     'favorite-home': (
         'com/daudio/app/dipo/service/w.smali',
         '.method public final onReceive(Landroid/content/Context;Landroid/content/Intent;)V',
-        '    :cond_b7f\n',
-        '\n    iget-object v0, p0, Lcom/daudio/app/dipo/service/w;->R:' + SVC + '\n'
-        '\n    invoke-static {v0}, Lcom/daudio/app/dipo/service/LeafiaButtons;->onFavorite(' + SVC + ')V\n',
+        '    invoke-virtual {v1, v0}, ' + SVC + '->Z(I)V\n',
+        '\n    invoke-static {v1}, Lcom/daudio/app/dipo/service/LeafiaButtons;->onFavorite(' + SVC + ')V\n',
+    ),
+    # createCarPlay(..., playback PlayPause, prevNext v27, home v28, back v29,
+    # button v30, ...): the consumer HID device the phone is told about.
+    # Stock leaves Home and Back out, so the phone ignores those reports.
+    'hid-home-back': (
+        'com/daudio/app/dipo/e/b.smali',
+        '.method public final l()Z',
+        '    sget-object v33, Lcom/daudio/app/dipo/telechips/CarPlayPrimaryDevice;->TouchScreen:Lcom/daudio/app/dipo/telechips/CarPlayPrimaryDevice;\n',
+        '\n    const/16 v28, 0x1\n'
+        '\n    const/16 v29, 0x1\n',
     ),
 }
 
