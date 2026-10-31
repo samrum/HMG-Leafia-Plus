@@ -5,7 +5,9 @@ usage: hooks.py <smali dir> <feature> [<feature> ...]
 
 Features:
   auto-open  q.onSessionStarted -> com.ev6.cpwl.LeafiaAutoOpen.schedule
-             (switch to CarPlay about 1.5 s after a CarPlay session starts)
+             (switch to CarPlay 0.5 s after a CarPlay session starts)
+  auto-open-home  e.b.r() -> LeafiaAutoOpen.afterNowPlaying
+             (after that switch asks the phone for Now Playing, show Home)
   mute       v.onAllKeyForService -> LeafiaMuteKey.onKey
              (mute key pauses CarPlay audio, unmute resumes it)
   call-key   v.onAllKeyForService -> LeafiaButtons.onCallKey
@@ -30,6 +32,12 @@ HOOKS = {
         '    invoke-virtual {v1, v0, v2, v3}, ' + SVC + '->a(Landroid/os/Message;J)V\n',
         '\n    iget-object v1, p0, Lcom/daudio/app/dipo/service/q;->R:' + SVC + '\n'
         '\n    invoke-static {v1}, Lcom/ev6/cpwl/LeafiaAutoOpen;->schedule(' + SVC + ')V\n',
+    ),
+    'auto-open-home': (
+        'com/daudio/app/dipo/e/b.smali',
+        '.method public final r()V',
+        '    invoke-virtual {v0, v1}, Lcom/daudio/app/dipo/telechips/CarPlayService;->requestUI(Ljava/lang/String;)V\n',
+        '\n    invoke-static {}, Lcom/ev6/cpwl/LeafiaAutoOpen;->afterNowPlaying()V\n',
     ),
     'mute': (
         'com/daudio/app/dipo/service/v.smali',
