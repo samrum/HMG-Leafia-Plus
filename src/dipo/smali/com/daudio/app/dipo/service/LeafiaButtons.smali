@@ -173,7 +173,8 @@
     return-void
 .end method
 
-# Favorite released while CarPlay is on screen, and set to Phone Projection.
+# Favorite released while CarPlay is on screen, and set to Phone Projection
+# (key action DIPO_CUSTOM_SHORTCUT, the broadcast w.onReceive handles).
 .method private static favKey(Lcom/daudio/app/dipo/service/DipoService;III)V
     .registers 8
 
@@ -223,7 +224,25 @@
     move-result-object v1
 
     :goto_check
-    const-string v2, "com.hkmc.intent.action.PHONE_SHORTCUT"
+    const-string v2, "CarPlay_"
+
+    new-instance v3, Ljava/lang/StringBuilder;
+
+    const-string v0, "Leafia: favorite key on screen, action "
+
+    invoke-direct {v3, v0}, Ljava/lang/StringBuilder;-><init>(Ljava/lang/String;)V
+
+    invoke-virtual {v3, v1}, Ljava/lang/StringBuilder;->append(Ljava/lang/String;)Ljava/lang/StringBuilder;
+
+    move-result-object v3
+
+    invoke-virtual {v3}, Ljava/lang/StringBuilder;->toString()Ljava/lang/String;
+
+    move-result-object v3
+
+    invoke-static {v2, v3}, Landroid/util/Log;->i(Ljava/lang/String;Ljava/lang/String;)I
+
+    const-string v2, "com.hkmc.intent.action.DIPO_CUSTOM_SHORTCUT"
 
     invoke-virtual {v2, v1}, Ljava/lang/String;->equals(Ljava/lang/Object;)Z
 
