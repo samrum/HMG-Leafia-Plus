@@ -3,13 +3,14 @@
 .source "LeafiaAutoOpen.java"
 
 # Opens CarPlay when a CarPlay session starts, then shows CarPlay Home.
-#   step 0, 0.5 s after the session starts: switch to CarPlay through the
-#     car's ModeManager (media path: Now Playing, playback resumes).
-#   step 3, 0.4 s after that switch asks the phone for Now Playing
+#   step 0 (open), 0.5 s after the session starts: switch to CarPlay through
+#     the car's ModeManager (media path: Now Playing, playback resumes).
+#   step 1 (home), 0.4 s after that switch asks the phone for Now Playing
 #     (afterNowPlaying, hooked in e.b.r()): CarPlay Home.
-#   step 1, 2.5 s after the switch, if Home hasn't been sent: Home if
-#     CarPlay is on screen, or else switch once more.
-#   step 2, 2.5 s after the retry: Home if CarPlay is on screen, then stop.
+#   step 2 (check), 2.5 s after the switch: if CarPlay isn't on screen,
+#     switch once more. If it is, leave it: Home is sent only after Now
+#     Playing, since Home on the Dashboard would go to the app grid.
+#   step 3 (last check), 2.5 s after the retry: stop.
 
 # interfaces
 .implements Ljava/lang/Runnable;
@@ -131,7 +132,7 @@
 
     if-eqz v0, :cond_done
 
-    const/4 v1, 0x3
+    const/4 v1, 0x1
 
     const-wide/16 v2, 0x190
 
@@ -206,7 +207,7 @@
 
     invoke-static {v1, v4}, Lcom/ev6/cpwl/LeafiaAutoOpen;->launch(Lcom/daudio/app/dipo/service/DipoService;Landroid/content/Context;)V
 
-    const/4 v2, 0x1
+    const/4 v2, 0x2
 
     const-wide/16 v5, 0x9c4
 
@@ -215,7 +216,12 @@
     return-void
 
     :cond_follow_up
-    if-eqz v2, :cond_not_shown
+    const/4 v5, 0x1
+
+    if-ne v3, v5, :cond_check
+
+    # step 1: Now Playing was requested
+    if-eqz v2, :cond_done
 
     const/4 v2, 0x0
 
@@ -225,8 +231,22 @@
 
     return-void
 
+    :cond_check
+    if-eqz v2, :cond_not_shown
+
+    # steps 2-3, on screen without a Now Playing request: leave it as it is
+    const/4 v2, 0x0
+
+    sput-boolean v2, Lcom/ev6/cpwl/LeafiaAutoOpen;->pending:Z
+
+    const-string v2, "Leafia: auto-open CarPlay on screen, no Home"
+
+    invoke-static {v0, v2}, Landroid/util/Log;->i(Ljava/lang/String;Ljava/lang/String;)I
+
+    return-void
+
     :cond_not_shown
-    const/4 v2, 0x1
+    const/4 v2, 0x2
 
     if-ne v3, v2, :cond_give_up
 
@@ -236,7 +256,7 @@
 
     invoke-static {v1, v4}, Lcom/ev6/cpwl/LeafiaAutoOpen;->launch(Lcom/daudio/app/dipo/service/DipoService;Landroid/content/Context;)V
 
-    const/4 v2, 0x2
+    const/4 v2, 0x3
 
     const-wide/16 v5, 0x9c4
 
@@ -245,10 +265,6 @@
     return-void
 
     :cond_give_up
-    const/4 v2, 0x2
-
-    if-ne v3, v2, :cond_done
-
     const/4 v2, 0x0
 
     sput-boolean v2, Lcom/ev6/cpwl/LeafiaAutoOpen;->pending:Z

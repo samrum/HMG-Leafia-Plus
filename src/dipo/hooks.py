@@ -13,7 +13,7 @@ Features:
   call-key   v.onAllKeyForService -> LeafiaButtons.onCallKey
              (Call key with no call: press = CarPlay Back, hold = Maps)
   favorite-home  w.onReceive (ACTION_SHORTCUT_DIPO_CUSTOM) -> LeafiaButtons.onFavorite
-             (Favorite set to Phone Projection shows the CarPlay Dashboard)
+             (Favorite set to Phone Projection: CarPlay Home while on screen)
   hid-home-back  e.b.l() createCarPlay arguments
              (the car's CarPlay buttons include Home and Back, so the phone
              accepts them; needed by auto-open-home, call-key, favorite-home)
