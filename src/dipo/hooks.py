@@ -14,6 +14,9 @@ Features:
              (Call key with no call: press = CarPlay Back, hold = Maps)
   favorite-home  w.onReceive (ACTION_SHORTCUT_DIPO_CUSTOM) -> LeafiaButtons.onFavorite
              (Favorite set to Phone Projection: CarPlay Home while on screen)
+  screen-restart  q.onScreenTimeout -> LeafiaScreenRestart.onTimeout
+             (after a CarPlay video timeout, restart the video if CarPlay is
+             on screen, instead of leaving the last frame frozen)
   hid-home-back  e.b.l() createCarPlay arguments
              (the car's CarPlay buttons include Home and Back, so the phone
              accepts them; needed by auto-open-home, call-key, favorite-home)
@@ -68,6 +71,14 @@ HOOKS = {
         '    :cond_b7f\n',
         '\n    iget-object v0, p0, Lcom/daudio/app/dipo/service/w;->R:' + SVC + '\n'
         '\n    invoke-static {v0}, Lcom/daudio/app/dipo/service/LeafiaButtons;->onFavorite(' + SVC + ')V\n',
+    ),
+    # stock onScreenTimeout only sets mScreenTimeout (DipoService.G(svc, true)).
+    'screen-restart': (
+        'com/daudio/app/dipo/service/q.smali',
+        '.method public final onScreenTimeout()V',
+        '    invoke-static {v0, v1}, ' + SVC + '->G(' + SVC + 'Z)Z\n',
+        '\n    iget-object v0, p0, Lcom/daudio/app/dipo/service/q;->R:' + SVC + '\n'
+        '\n    invoke-static {v0}, Lcom/daudio/app/dipo/service/LeafiaScreenRestart;->onTimeout(' + SVC + ')V\n',
     ),
     # createCarPlay(..., playback PlayPause, prevNext v27, home v28, back v29,
     # button v30, ...): the consumer HID device the phone is told about.
