@@ -8,6 +8,7 @@ stock methods, each tied to an anchor that must occur once.
 | Feature | Class | Hooked from |
 |---|---|---|
 | `auto-open`: switch to CarPlay about 1.5 s after a session starts, through the car's ModeManager (`launchMode(DIPO)`, the media path: Now Playing, and playback resumes) | `com.ev6.cpwl.LeafiaAutoOpen` | `service.q.onSessionStarted` |
+| `mute`: on release of the mute key (91), when CarPlay owns main audio and there is no CarPlay call or Siri, send Pause if the car is now muted or Play if not | `com.daudio.app.dipo.service.LeafiaMuteKey` (in that package for DipoService's audio-manager accessor `B()`) | start of `service.v.onAllKeyForService` |
 
 Classes called from another package must be `public`, with `public` entry points.
 The mock head unit doesn't run Dalvik, so a mistake there only shows on the car
