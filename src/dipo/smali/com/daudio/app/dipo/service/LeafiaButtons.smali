@@ -7,9 +7,8 @@
 #     hold 600 ms = CarPlay Maps (opens CarPlay first if needed).
 #     During a call, ringing, or Siri the key is left to the stock code
 #     (answer / hang up).
-#   Favorite set to Phone Projection: when it opens CarPlay, CarPlay Home
-#     right after (onFavorite); while CarPlay is on screen, where the stock
-#     code does nothing, CarPlay Home on release (favKey).
+#   Favorite set to Phone Projection: CarPlay Dashboard (LeafiaFavorite),
+#     from the shortcut broadcast (onFavorite) or the key itself (favKey).
 #   Home and Back need the hid-home-back hook, or the phone ignores them.
 
 # interfaces
@@ -397,31 +396,12 @@
 .end method
 
 # Called from w.onReceive on ACTION_SHORTCUT_DIPO_CUSTOM (Favorite set to Phone
-# Projection) right after the stock code opens CarPlay, and from favKey.
+# Projection) after the stock checks, whether or not CarPlay is on screen,
+# and from favKey. LeafiaFavorite counts a press once.
 .method public static onFavorite(Lcom/daudio/app/dipo/service/DipoService;)V
-    .registers 4
+    .registers 1
 
-    const-string v0, "CarPlay_"
-
-    :try_start
-    const-string v1, "Leafia: favorite key, CarPlay Home"
-
-    invoke-static {v0, v1}, Landroid/util/Log;->i(Ljava/lang/String;Ljava/lang/String;)I
-
-    sget-object v1, Lcom/daudio/app/dipo/telechips/CarPlayConsumer;->ACHome:Lcom/daudio/app/dipo/telechips/CarPlayConsumer;
-
-    invoke-static {p0, v1}, Lcom/daudio/app/dipo/service/LeafiaButtons;->send(Lcom/daudio/app/dipo/service/DipoService;Lcom/daudio/app/dipo/telechips/CarPlayConsumer;)V
-    :try_end
-    .catch Ljava/lang/Throwable; {:try_start .. :try_end} :catch_all
-
-    return-void
-
-    :catch_all
-    move-exception v1
-
-    const-string v2, "Leafia: favorite key failed"
-
-    invoke-static {v0, v2, v1}, Landroid/util/Log;->w(Ljava/lang/String;Ljava/lang/String;Ljava/lang/Throwable;)I
+    invoke-static {p0}, Lcom/daudio/app/dipo/service/LeafiaFavorite;->start(Lcom/daudio/app/dipo/service/DipoService;)V
 
     return-void
 .end method

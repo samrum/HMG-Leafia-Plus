@@ -13,7 +13,7 @@ Features:
   call-key   v.onAllKeyForService -> LeafiaButtons.onCallKey
              (Call key with no call: press = CarPlay Back, hold = Maps)
   favorite-home  w.onReceive (ACTION_SHORTCUT_DIPO_CUSTOM) -> LeafiaButtons.onFavorite
-             (Favorite set to Phone Projection opens CarPlay on Home)
+             (Favorite set to Phone Projection shows the CarPlay Dashboard)
   hid-home-back  e.b.l() createCarPlay arguments
              (the car's CarPlay buttons include Home and Back, so the phone
              accepts them; needed by auto-open-home, call-key, favorite-home)
@@ -60,13 +60,14 @@ HOOKS = {
         '\n    return-void\n'
         '\n    :leafia_call_stock\n',
     ),
-    # stock: ... if (DipoActivity in front) return; Z(CarPlayMode). On screen,
-    # LeafiaButtons.onCallKey handles the key itself.
+    # stock: ... if (DipoActivity in front) return; Z(CarPlayMode). The hook
+    # runs before that check, so on and off screen.
     'favorite-home': (
         'com/daudio/app/dipo/service/w.smali',
         '.method public final onReceive(Landroid/content/Context;Landroid/content/Intent;)V',
-        '    invoke-virtual {v1, v0}, ' + SVC + '->Z(I)V\n',
-        '\n    invoke-static {v1}, Lcom/daudio/app/dipo/service/LeafiaButtons;->onFavorite(' + SVC + ')V\n',
+        '    :cond_b7f\n',
+        '\n    iget-object v0, p0, Lcom/daudio/app/dipo/service/w;->R:' + SVC + '\n'
+        '\n    invoke-static {v0}, Lcom/daudio/app/dipo/service/LeafiaButtons;->onFavorite(' + SVC + ')V\n',
     ),
     # createCarPlay(..., playback PlayPause, prevNext v27, home v28, back v29,
     # button v30, ...): the consumer HID device the phone is told about.
