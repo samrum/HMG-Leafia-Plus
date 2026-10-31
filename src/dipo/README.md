@@ -7,7 +7,12 @@ stock methods, each tied to an anchor that must occur once.
 
 | Feature | Class | Hooked from |
 |---|---|---|
-| `auto-open`: switch to CarPlay about 1.5 s after a session starts, through the car's ModeManager (`launchMode(DIPO)`, the media path: Now Playing, and playback resumes) | `com.ev6.cpwl.LeafiaAutoOpen` | `service.q.onSessionStarted` |
+| `auto-open`: switch to CarPlay 0.5 s after a session starts, through the car's ModeManager (`launchMode(DIPO)`, the media path: Now Playing, and playback resumes). If CarPlay isn't on screen 2.5 s later, it switches once more | `com.ev6.cpwl.LeafiaAutoOpen` | `service.q.onSessionStarted` |
+| `auto-open-home`: 0.4 s after that switch asks the phone for Now Playing, send CarPlay Home (from Now Playing, Home goes to the Dashboard); if CarPlay isn't on screen yet then, Home goes out at the 2.5 s check; if that request never comes, no Home is sent (Home on the Dashboard would go to the app grid) | `com.ev6.cpwl.LeafiaAutoOpen` | `e.b.r()`, after `requestUI("nowplaying:")` |
+| `mute`: on release of the mute key (91), when CarPlay owns main audio and there is no CarPlay call or Siri, send Pause if the car is now muted or Play if not | `com.daudio.app.dipo.service.LeafiaMuteKey` (in that package for DipoService's audio-manager accessor `B()`) | start of `service.v.onAllKeyForService` |
+| `call-key`: the Call key (5) with no call, ringing call or Siri: a short press sends CarPlay Back (only while CarPlay is on screen), holding it 600 ms opens CarPlay Maps (`displayMap`, or DipoActivity mode 1 to bring CarPlay up first). Otherwise the stock answer/hang-up handling runs | `com.daudio.app.dipo.service.LeafiaButtons` | start of `service.v.onAllKeyForService` (returns early when it took the key) |
+| `favorite-home`: the Favorite key set to Phone Projection, while CarPlay is on screen (where the stock code does nothing), sends CarPlay Home, like the on-screen Home icon (from an app to the last home view, from the Dashboard to the app grid). When CarPlay is not on screen the stock Phone Projection open runs unchanged. | `com.daudio.app.dipo.service.LeafiaButtons` (`onFavorite`) | `service.w.onReceive` (`DIPO_CUSTOM_SHORTCUT`, before the DipoActivity check) |
+| `hid-home-back`: the consumer HID device the car declares to the phone at session setup includes Home and Back (stock: play/pause and prev/next only), so the phone acts on `ACHome`/`ACBack` | none | `e.b.l()`, the `createCarPlay` arguments |
 
 Classes called from another package must be `public`, with `public` entry points.
 The mock head unit doesn't run Dalvik, so a mistake there only shows on the car

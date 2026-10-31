@@ -5,7 +5,18 @@ usage: hooks.py <smali dir> <feature> [<feature> ...]
 
 Features:
   auto-open  q.onSessionStarted -> com.ev6.cpwl.LeafiaAutoOpen.schedule
-             (switch to CarPlay about 1.5 s after a CarPlay session starts)
+             (switch to CarPlay 0.5 s after a CarPlay session starts)
+  auto-open-home  e.b.r() -> LeafiaAutoOpen.afterNowPlaying
+             (after that switch asks the phone for Now Playing, show Home)
+  mute       v.onAllKeyForService -> LeafiaMuteKey.onKey
+             (mute key pauses CarPlay audio, unmute resumes it)
+  call-key   v.onAllKeyForService -> LeafiaButtons.onCallKey
+             (Call key with no call: press = CarPlay Back, hold = Maps)
+  favorite-home  w.onReceive (ACTION_SHORTCUT_DIPO_CUSTOM) -> LeafiaButtons.onFavorite
+             (Favorite set to Phone Projection: CarPlay Home while on screen)
+  hid-home-back  e.b.l() createCarPlay arguments
+             (the car's CarPlay buttons include Home and Back, so the phone
+             accepts them; needed by auto-open-home, call-key, favorite-home)
 
 Each hook is inserted at one anchor in stock code that must occur exactly once
 in its method, so an unexpected tree stops the build instead of patching the
@@ -24,6 +35,49 @@ HOOKS = {
         '    invoke-virtual {v1, v0, v2, v3}, ' + SVC + '->a(Landroid/os/Message;J)V\n',
         '\n    iget-object v1, p0, Lcom/daudio/app/dipo/service/q;->R:' + SVC + '\n'
         '\n    invoke-static {v1}, Lcom/ev6/cpwl/LeafiaAutoOpen;->schedule(' + SVC + ')V\n',
+    ),
+    'auto-open-home': (
+        'com/daudio/app/dipo/e/b.smali',
+        '.method public final r()V',
+        '    invoke-virtual {v0, v1}, Lcom/daudio/app/dipo/telechips/CarPlayService;->requestUI(Ljava/lang/String;)V\n',
+        '\n    invoke-static {}, Lcom/ev6/cpwl/LeafiaAutoOpen;->afterNowPlaying()V\n',
+    ),
+    'mute': (
+        'com/daudio/app/dipo/service/v.smali',
+        '.method public final onAllKeyForService(IIIIIIIZ)V',
+        '    .registers 14\n',
+        '\n    iget-object v0, p0, Lcom/daudio/app/dipo/service/v;->R:' + SVC + '\n'
+        '\n    invoke-static {v0, p1, p2, p4, p7}, Lcom/daudio/app/dipo/service/LeafiaMuteKey;->onKey(' + SVC + 'IIII)V\n',
+    ),
+    'call-key': (
+        'com/daudio/app/dipo/service/v.smali',
+        '.method public final onAllKeyForService(IIIIIIIZ)V',
+        '    .registers 14\n',
+        '\n    iget-object v0, p0, Lcom/daudio/app/dipo/service/v;->R:' + SVC + '\n'
+        '\n    invoke-static {v0, p1, p2, p4, p7}, Lcom/daudio/app/dipo/service/LeafiaButtons;->onCallKey(' + SVC + 'IIII)Z\n'
+        '\n    move-result v0\n'
+        '\n    if-eqz v0, :leafia_call_stock\n'
+        '\n    return-void\n'
+        '\n    :leafia_call_stock\n',
+    ),
+    # stock: ... if (DipoActivity in front) return; Z(CarPlayMode). The hook
+    # runs before that check, so on and off screen.
+    'favorite-home': (
+        'com/daudio/app/dipo/service/w.smali',
+        '.method public final onReceive(Landroid/content/Context;Landroid/content/Intent;)V',
+        '    :cond_b7f\n',
+        '\n    iget-object v0, p0, Lcom/daudio/app/dipo/service/w;->R:' + SVC + '\n'
+        '\n    invoke-static {v0}, Lcom/daudio/app/dipo/service/LeafiaButtons;->onFavorite(' + SVC + ')V\n',
+    ),
+    # createCarPlay(..., playback PlayPause, prevNext v27, home v28, back v29,
+    # button v30, ...): the consumer HID device the phone is told about.
+    # Stock leaves Home and Back out, so the phone ignores those reports.
+    'hid-home-back': (
+        'com/daudio/app/dipo/e/b.smali',
+        '.method public final l()Z',
+        '    sget-object v33, Lcom/daudio/app/dipo/telechips/CarPlayPrimaryDevice;->TouchScreen:Lcom/daudio/app/dipo/telechips/CarPlayPrimaryDevice;\n',
+        '\n    const/16 v28, 0x1\n'
+        '\n    const/16 v29, 0x1\n',
     ),
 }
 
