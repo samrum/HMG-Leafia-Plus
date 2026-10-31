@@ -2,14 +2,10 @@
 .super Ljava/lang/Object;
 .source "LeafiaFavorite.java"
 
-# Leafia: the Favorite key set to Phone Projection shows the CarPlay home.
-# CarPlay Home from inside an app goes to the last home view (usually the
-# Dashboard), and from the Dashboard to the app grid, like the Home icon.
-#   CarPlay on screen: step 1 right away, Home only.
-#   CarPlay opening: CarPlay often comes back on the Dashboard, so open an
-#   app first.
-#     step 0, 0.8 s after the press: Now Playing
-#     step 1, 0.6 s later: CarPlay Home
+# Leafia: the Favorite key set to Phone Projection, while CarPlay is on
+# screen, sends CarPlay Home, like the on-screen Home icon (from an app to the
+# last home view, usually the Dashboard; from the Dashboard to the app grid).
+# When CarPlay is not on screen the stock Phone Projection open runs alone.
 # Home needs the hid-home-back hook, or the phone ignores it.
 
 # interfaces
@@ -100,9 +96,8 @@
 
     move-result v1
 
-    if-eqz v1, :cond_closed
+    if-eqz v1, :goto_posted
 
-    # on screen: Home only, like the Home icon
     const-string v1, "Leafia: favorite key, CarPlay on screen"
 
     invoke-static {v4, v1}, Landroid/util/Log;->i(Ljava/lang/String;Ljava/lang/String;)I
@@ -110,19 +105,6 @@
     const/4 v1, 0x1
 
     const-wide/16 v2, 0x0
-
-    invoke-static {p0, v1, v2, v3}, Lcom/daudio/app/dipo/service/LeafiaFavorite;->post(Lcom/daudio/app/dipo/service/DipoService;IJ)V
-
-    goto :goto_posted
-
-    :cond_closed
-    const-string v1, "Leafia: favorite key, opening CarPlay Dashboard"
-
-    invoke-static {v4, v1}, Landroid/util/Log;->i(Ljava/lang/String;Ljava/lang/String;)I
-
-    const/4 v1, 0x0
-
-    const-wide/16 v2, 0x320
 
     invoke-static {p0, v1, v2, v3}, Lcom/daudio/app/dipo/service/LeafiaFavorite;->post(Lcom/daudio/app/dipo/service/DipoService;IJ)V
 
@@ -157,27 +139,6 @@
 
     if-eqz v2, :cond_done
 
-    iget v3, p0, Lcom/daudio/app/dipo/service/LeafiaFavorite;->step:I
-
-    if-nez v3, :cond_home
-
-    invoke-static {v1}, Lcom/daudio/app/dipo/service/DipoService;->k(Lcom/daudio/app/dipo/service/DipoService;)Lcom/daudio/app/dipo/e/b;
-
-    move-result-object v2
-
-    if-eqz v2, :cond_done
-
-    invoke-virtual {v2}, Lcom/daudio/app/dipo/e/b;->r()V
-
-    const/4 v2, 0x1
-
-    const-wide/16 v4, 0x258
-
-    invoke-static {v1, v2, v4, v5}, Lcom/daudio/app/dipo/service/LeafiaFavorite;->post(Lcom/daudio/app/dipo/service/DipoService;IJ)V
-
-    return-void
-
-    :cond_home
     const-string v2, "Leafia: favorite key, CarPlay Home"
 
     invoke-static {v0, v2}, Landroid/util/Log;->i(Ljava/lang/String;Ljava/lang/String;)I
