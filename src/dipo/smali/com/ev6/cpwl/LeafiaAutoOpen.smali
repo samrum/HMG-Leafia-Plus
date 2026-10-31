@@ -8,8 +8,9 @@
 #   step 1 (home), 0.4 s after that switch asks the phone for Now Playing
 #     (afterNowPlaying, hooked in e.b.r()): CarPlay Home.
 #   step 2 (check), 2.5 s after the switch: if CarPlay isn't on screen,
-#     switch once more. If it is, leave it: Home is sent only after Now
-#     Playing, since Home on the Dashboard would go to the app grid.
+#     switch once more. If it is, Home when Now Playing was requested but
+#     CarPlay wasn't on screen yet at step 1; with no Now Playing request
+#     leave it, since Home on the Dashboard would go to the app grid.
 #   step 3 (last check), 2.5 s after the retry: stop.
 
 # interfaces
@@ -18,6 +19,8 @@
 
 # static fields
 .field private static volatile pending:Z
+
+.field private static volatile nowPlaying:Z
 
 .field private static volatile pendingSvc:Lcom/daudio/app/dipo/service/DipoService;
 
@@ -66,6 +69,10 @@
     .registers 5
 
     sput-object p0, Lcom/ev6/cpwl/LeafiaAutoOpen;->pendingSvc:Lcom/daudio/app/dipo/service/DipoService;
+
+    const/4 v0, 0x0
+
+    sput-boolean v0, Lcom/ev6/cpwl/LeafiaAutoOpen;->nowPlaying:Z
 
     const/4 v0, 0x1
 
@@ -133,6 +140,8 @@
     if-eqz v0, :cond_done
 
     const/4 v1, 0x1
+
+    sput-boolean v1, Lcom/ev6/cpwl/LeafiaAutoOpen;->nowPlaying:Z
 
     const-wide/16 v2, 0x190
 
@@ -234,11 +243,20 @@
     :cond_check
     if-eqz v2, :cond_not_shown
 
-    # steps 2-3, on screen without a Now Playing request: leave it as it is
     const/4 v2, 0x0
 
     sput-boolean v2, Lcom/ev6/cpwl/LeafiaAutoOpen;->pending:Z
 
+    # steps 2-3 on screen: Home if Now Playing came before CarPlay showed
+    sget-boolean v2, Lcom/ev6/cpwl/LeafiaAutoOpen;->nowPlaying:Z
+
+    if-eqz v2, :cond_no_home
+
+    invoke-static {v1}, Lcom/ev6/cpwl/LeafiaAutoOpen;->home(Lcom/daudio/app/dipo/service/DipoService;)V
+
+    return-void
+
+    :cond_no_home
     const-string v2, "Leafia: auto-open CarPlay on screen, no Home"
 
     invoke-static {v0, v2}, Landroid/util/Log;->i(Ljava/lang/String;Ljava/lang/String;)I
