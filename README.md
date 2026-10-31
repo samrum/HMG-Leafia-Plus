@@ -25,6 +25,7 @@ Firmware differs between models, regions and versions, so whole-file checksums r
 | Projection settings menu | On US/Canada units, Settings > Phone Projection keeps opening Device Connections (CarPlay split screen, connected phones), as on stock firmware; applied only where the Bluetooth settings app is the stock one the fix was made for | `patches/common/optional` (`HKMC_BtSettings`) |
 | CarPlay Bluetooth bridge | Starts wireless CarPlay over Bluetooth/iAP2 | Rebuilt on the unit from its stock apps (`patches/<car>`) |
 | Turn-by-turn | Projection navigation on the cluster and HUD | Rebuilt on the unit from its stock apps (`patches/<car>`). Uses only the standard cluster calls, so cars without a HUD are fine. The installer refuses if the firmware lacks any call it needs. |
+| CarPlay auto-open (Ioniq 5 US only) | Switches the screen to CarPlay about 1.5 s after a CarPlay session starts, the same switch as the "Open Apple CarPlay" widget; skipped if CarPlay is already on screen | Part of the CarPlay bridge build (`patches/neev`) |
 
 Cars without a patch set yet get **basic mode**: only the wireless projection part, which gives wireless Android Auto on any Gen5W unit with a Wi-Fi module. The installer also saves a report so a full build can be made for that car.
 
