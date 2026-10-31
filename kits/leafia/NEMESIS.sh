@@ -284,7 +284,7 @@ dmesg 2>/dev/null | grep -E 'tcc-sdhc: SDHC|SDIO card|DHD generic adapter|dhd_mo
     done >> "$SUM"
 
 # our own logs: install steps, file names and checksums only
-for _l in $PKG wireless.projection projection.tbt wireless.carplay.bt carplay.wifi.audio projection.menu; do
+for _l in $PKG wireless.projection projection.tbt wireless.carplay.bt carplay.wifi.audio projection.menu wifi.client; do
     copy_file "$N/$_l.log" "$PUB/logs/$_l.log"
 done
 
@@ -322,7 +322,7 @@ ip rule > "$LOGS/ip-rule.txt" 2>&1
 iptables -S > "$LOGS/iptables.txt" 2>&1
 iptables -t nat -S >> "$LOGS/iptables.txt" 2>&1
 copy_file /data/misc/dhcp/dnsmasq.leases "$LOGS/dnsmasq.leases"
-logcat -d -v time -s Tethering:V WifiStateMachine:V SoftApStateMachine:V WifiService:V WifiManager:V \
+logcat -d -v time -s Tethering:V LeafiaWifi:V WifiStateMachine:V SoftApStateMachine:V WifiService:V WifiManager:V \
     ConnectivityService:V NetworkManagementService:V NetdConnector:V netd:V dnsmasq:V hostapd:I \
     > "$LOGS/logcat-network.txt" 2>&1
 # Crash records: only the latest by default (a crash loop leaves thousands, and

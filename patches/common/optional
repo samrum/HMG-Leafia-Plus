@@ -9,3 +9,7 @@
 5_menu app HKMC_BtSettings common/HKMC_BtSettings.menu.9096dec5.lpd e7c90e78f45f7e6b9c90ddd7a238b566
 5_menu app HKMC_BtSettings common/HKMC_BtSettings.menu.9096dec5.lpd 93ecaa97597a79be2a10728e45c72b33
 5_menu app HKMC_BtSettings common/HKMC_BtSettings.menu.8acbf4eb.lpd b977e268fbe73cb5637c4413647a7dea
+# HKMC_WifiSettings (only with the opt-in Wi-Fi client): the Wi-Fi screen keeps the CarPlay/AA
+# hotspot when it opens, switches between it and the client without the stock "Error", and labels
+# its tab "Wi-Fi". One line per stock APK (tools/mkwifi.py).
+6_wifi app HKMC_WifiSettings common/HKMC_WifiSettings.wifi.164039dd.lpd 32475800701fe7deaf3898d7b9d21fab
