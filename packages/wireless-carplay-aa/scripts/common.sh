@@ -9,6 +9,9 @@
 #   4 carplay.wifi.audio   wireless CarPlay audio: AAC music, Opus Siri/calls/mic
 #   5 projection.menu      Settings > Phone Projection opens Device Connections again on
 #                          US/Canada units (optional: only where HKMC_BtSettings matches)
+#   6 wifi.client          with the opt-in Wi-Fi client: the Wi-Fi screen keeps the projection
+#                          hotspot, switches between it and the client without the stock "Error",
+#                          and labels its tab "Wi-Fi" (optional: only where HKMC_WifiSettings matches)
 # Not included: TCP ADB (adb.tcp), the temporary debug logging, and Android Auto
 # car data (projection.cardata, EV-specific) - that installs separately on top of this.
 # Uninstall undoes the parts in reverse order, back to stock.
@@ -17,8 +20,8 @@
 # Each part also checks the exact stock checksums before writing anything.
 export PATH=/data/nemesis/bin:/sbin:/vendor/bin:/system/sbin:/system/bin:/system/xbin
 LOG=/data/nemesis/wireless.carplay.aa.log
-PARTS="1_projection 2_tbt 3_bridge 4_audio 5_menu"
-PARTS_REV="5_menu 4_audio 3_bridge 2_tbt 1_projection"
+PARTS="1_projection 2_tbt 3_bridge 4_audio 5_menu 6_wifi"
+PARTS_REV="6_wifi 5_menu 4_audio 3_bridge 2_tbt 1_projection"
 # separate packages that change the same files (the ones this replaces, and
 # NEMESIS's own carplay.session) - they must be uninstalled first
 LEGACY="wireless.projection projection.tbt wireless.carplay.bt carplay.wifi.audio carplay.debuglog carplay.session"
@@ -32,7 +35,7 @@ LOGS_DIR=/data/nemesis/logs/wireless.carplay.aa
 mirror_logs() {
     local _l
     mkdir -p "$LOGS_DIR" 2>/dev/null || return 0
-    for _l in wireless.carplay.aa wireless.projection projection.tbt wireless.carplay.bt carplay.wifi.audio projection.menu; do
+    for _l in wireless.carplay.aa wireless.projection projection.tbt wireless.carplay.bt carplay.wifi.audio projection.menu wifi.client; do
         [ -f "/data/nemesis/$_l.log" ] && cp "/data/nemesis/$_l.log" "$LOGS_DIR/$_l.log" 2>/dev/null
     done
     true
@@ -49,6 +52,7 @@ part_name() {
         3_bridge) echo wireless.carplay.bt ;;
         4_audio) echo carplay.wifi.audio ;;
         5_menu) echo projection.menu ;;
+        6_wifi) echo wifi.client ;;
     esac
 }
 
@@ -273,13 +277,13 @@ uninstall_parts() {
 # does: a run that dies leaves them stopped, and running the package again ends with them started.
 # An earlier run's leftovers stay stopped and join this run's list. With Android down nothing is
 # running and pm is not available: nothing to do.
-HOLD_PKGS="com.google.android.projection.sink com.daudio.app.dipo com.tcc.iap2server com.mnsoft.navi com.android.btsettings"
+HOLD_PKGS="com.google.android.projection.sink com.daudio.app.dipo com.tcc.iap2server com.mnsoft.navi com.android.btsettings com.hkmc.wifisettings"
 HOLD_FILE=/data/nemesis/wireless.carplay.aa.stopped
 android_up() { [ "$(getprop sys.boot_completed 2>/dev/null)" = 1 ]; }
 apps_hold() {
     local _p
-    # only parts 2, 3 and 5 replace these apps' files (basic mode has none of them)
-    case " $1 " in *" 2_tbt "*|*" 3_bridge "*|*" 5_menu "*) ;; *) return 0 ;; esac
+    # only parts 2, 3, 5 and 6 replace these apps' files (basic mode has none of them)
+    case " $1 " in *" 2_tbt "*|*" 3_bridge "*|*" 5_menu "*|*" 6_wifi "*) ;; *) return 0 ;; esac
     android_up || return 0
     touch "$HOLD_FILE" 2>/dev/null || { log "WARN: cannot record stopped apps; not stopping them"; return 0; }
     for _p in $HOLD_PKGS; do

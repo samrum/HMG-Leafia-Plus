@@ -545,9 +545,10 @@ apply_all() {
         putline 1 > "$BACKUP_DIR/wifi_client" 2>/dev/null || true
         log "Wi-Fi client on (LEAFIA-WIFI-CLIENT on the install drive): Wi-Fi menu and client + wireless mode"
     fi
-    # Firmware that removed the hotspot feature (Korean) also lacks the Wi-Fi feature
-    # files: add the missing ones there, so the hotspot (and the Wi-Fi chip) can start.
-    # US units already have both, and are left as they are.
+    # Firmware whose featurexml removes the hotspot feature (Korean, also the US Ioniq 5)
+    # lacks the Wi-Fi feature files too: add the missing ones there, so the hotspot (and the
+    # Wi-Fi chip) can start. On those units the Wi-Fi tab shows even without the opt-in
+    # (part 6_wifi then fixes its screen). Units that already have both are left as they are.
     if hotspot_was_removed; then
         [ -f "$BACKUP_DIR/perm.$HOTSPOT_XML.absent" ] && { apply_perm "$HOTSPOT_XML" || return 1; }
         [ -f "$BACKUP_DIR/perm.$WIFI_XML.absent" ] && { apply_perm "$WIFI_XML" || return 1; }

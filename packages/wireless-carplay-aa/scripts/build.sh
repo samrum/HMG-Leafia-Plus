@@ -8,6 +8,7 @@
 BUILD_DIR=/data/nemesis/build/wireless.carplay.aa
 TBT_BACKUP=/data/nemesis/backup/projection.tbt
 MENU_BACKUP=/data/nemesis/backup/projection.menu
+WIFI_BACKUP=/data/nemesis/backup/wifi.client
 LP_ROOT=.
 . ./scripts/lpatch.sh
 
@@ -25,7 +26,7 @@ lp_md5() {
 # file may already be modified), otherwise the live file
 stock_src() {
     local _b
-    for _b in "$TBT_BACKUP/${1##*/}" "$MENU_BACKUP/${1##*/}"; do
+    for _b in "$TBT_BACKUP/${1##*/}" "$MENU_BACKUP/${1##*/}" "$WIFI_BACKUP/${1##*/}"; do
         [ -s "$_b" ] && { echo "$_b"; return; }
     done
     echo "$1"
