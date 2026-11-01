@@ -96,6 +96,11 @@ def md5(p):
     return hashlib.md5(open(p, 'rb').read()).hexdigest()
 
 
+def classes(odex):
+    r = subprocess.run(['java', '-jar', BAKSMALI, 'list', 'classes', odex], capture_output=True, text=True)
+    return set(r.stdout.split()) if r.returncode == 0 else set()
+
+
 def run(*a, **kw):
     subprocess.run(a, check=True, **kw)
 
@@ -136,8 +141,21 @@ def main():
     work = a.work or tempfile.mkdtemp(prefix='mkwifi.')
     smali_dir = os.path.join(work, 'smali')
     shutil.rmtree(smali_dir, ignore_errors=True)
-    extra = [os.path.join(fw, f) for f in sorted(os.listdir(fw))
-             if f.endswith('.odex') and f[:-5] not in BCP]
+    # Other framework odex files help resolve the app's library classes, but one that also
+    # defines a class the app carries itself must stay out: baksmali then takes the
+    # framework's copy, while the unit (where that file is not on the boot class path)
+    # uses the app's own. automotive-service.odex has its own ITAppService with another
+    # method order, which turned the app's ITAppService stub (com.hkmc.telematics.service.a)
+    # into calls to the wrong methods and made dexopt reject the whole dex on the car.
+    app_classes = classes(odex)
+    extra = []
+    for f in sorted(os.listdir(fw)):
+        if f.endswith('.odex') and f[:-5] not in BCP:
+            same = app_classes & classes(os.path.join(fw, f))
+            if same:
+                print('leaving out %s (also defines %s)' % (f, ', '.join(sorted(same))), file=sys.stderr)
+            else:
+                extra.append(os.path.join(fw, f))
     r = subprocess.run(['java', '-jar', BAKSMALI, 'x', '-a', '18', '-j', '1', '-d', fw,
                         '-b', ':'.join(os.path.join(fw, b + '.odex') for b in BCP),
                         '-c', ':'.join(extra), '-o', smali_dir, odex],
@@ -151,6 +169,13 @@ def main():
     shutil.copytree(SRC, smali_dir, dirs_exist_ok=True)
     dex = os.path.join(work, 'classes.dex')
     run('java', '-jar', SMALI, 'a', '--api', '18', '-j', '1', '-o', dex, smali_dir)
+    # structural check (ART's dexdump, apt install dexdump), close to what dexopt checks first
+    if shutil.which('dexdump'):
+        r = subprocess.run(['dexdump', '-c', dex], capture_output=True, text=True)
+        if r.returncode != 0 or 'Failure' in r.stdout + r.stderr:
+            sys.exit('the built dex fails verification:\n' + (r.stdout + r.stderr)[-2000:])
+    else:
+        print('dexdump not found: built dex not verified (apt install dexdump)', file=sys.stderr)
 
     name = 'HKMC_WifiSettings.wifi.%s.lpd' % stock_md5[:8]
     common = os.path.join(a.patches, 'common')
@@ -163,7 +188,7 @@ def main():
 
     opt = os.path.join(common, 'optional')
     lines = open(opt).read().splitlines() if os.path.exists(opt) else []
-    lines = [l for l in lines if l != line]
+    lines = [l for l in lines if l.split()[:4] != line.split()[:4]]   # replaces an older build of this delta
     lines.append(line)
     open(opt, 'w').write('\n'.join(lines) + '\n')
     print(line)
