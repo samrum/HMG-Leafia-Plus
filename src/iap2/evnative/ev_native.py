@@ -48,6 +48,8 @@ VINFO_IDEN_TABLE = 0x30cec      # idenInfoVehicleInfoGroupList, 5 entries
 VSTAT_TABLE = 0x30b54           # idInfoVehicleStatusGroupList, 13 entries
 SEND_TABLE = 0x31d9c            # iAP2VehicleStatusSendList, 12 entries
 VINFO_IDEN_GETPTR = 0x11b3c     # iAP2ControlIden_VehicleInfoIdenGetPointer
+VSTAT_IDEN_GETPTR = 0x114f6     # iAP2ControlIden_VehicleStatusGetPointer
+LOG_ERROR = 0x17880             # iAP2InterfaceLogError (printf-style, always logged)
 UPDATES_GETPTR = 0x14970        # iAP2ControlVehicleStatusGetUpdatesPointer
 DATA_DELTA = 0x1000             # .data: file offset = va - 0x1000
 
@@ -84,6 +86,8 @@ def build_code(tmp):
                     '--defsym', 'EV_DATA=0x%x' % NEW_RW_VA,
                     '--defsym', 'STOCK_VINFO_IDEN_GETPTR=0x%x' % (VINFO_IDEN_GETPTR | 1),
                     '--defsym', 'STOCK_STATUS_UPDATES_GETPTR=0x%x' % (UPDATES_GETPTR | 1),
+                    '--defsym', 'STOCK_VSTAT_IDEN_GETPTR=0x%x' % (VSTAT_IDEN_GETPTR | 1),
+                    '--defsym', 'STOCK_LOG_ERROR=0x%x' % (LOG_ERROR | 1),
                     '-o', elf, o], check=True)
     syms = {}
     for line in subprocess.run(['arm-linux-gnueabi-nm', elf], check=True,
@@ -161,6 +165,8 @@ def main():
     lit(0x12800, 0x127dc, VINFO_IDEN_TABLE, vinfo_va, 'SetVehicleInfoInit table')
     lit(0x12834, 0x1280c, VINFO_IDEN_TABLE, vinfo_va, 'SetVehicleInfoDone table')
     lit(0x11928, 0x1189a, VINFO_IDEN_GETPTR | 1, syms['ev_vinfo_getptr'] | 1, 'Iden GetPointer')
+    # VehicleStatus identification: same values, but each declared id is logged
+    lit(0x1192c, 0x118a0, VSTAT_IDEN_GETPTR | 1, syms['ev_vstat_getptr'] | 1, 'Iden VehicleStatus GetPointer')
 
     # --- VehicleStatus identification: ids 9 -> 21, 12 -> 30 in place ---
     for idx, old, new in ((5, 9, 21), (8, 12, 30)):

@@ -38,9 +38,15 @@ def cstr(uc,a):
         if c==b'\0': return s
         s+=bytes(c)
 calls=[]
+logs=[]
 def hook(uc, addr, size, _):
     a = addr - B
-    if a in (0x17838, 0x1785c, 0x17880, 0x178a4): ret(uc)
+    if a == 0x17880:
+        fmt = cstr(uc, uc.reg_read(UC_ARM_REG_R0)).decode(errors='replace')
+        if fmt.startswith('Leafia'):
+            logs.append(fmt.strip().replace('%d', str(uc.reg_read(UC_ARM_REG_R1))))
+        ret(uc)
+    elif a in (0x17838, 0x1785c, 0x178a4): ret(uc)
     elif a == 0xfe4c: ret(uc, len(cstr(uc, uc.reg_read(UC_ARM_REG_R0))))
     elif a == 0xfca8:
         d,s,n=[uc.reg_read(r) for r in (UC_ARM_REG_R0,UC_ARM_REG_R1,UC_ARM_REG_R2)]
@@ -78,4 +84,15 @@ if 'send' in which:
     r = build(tbl, cnt, gp)
     print('A101', r)
     assert [p for p, v in r[2]] == [3, 6, 11, 15, 21, 22, 23, 24, 25, 30], r
+# VehicleStatus identification: flag 0, 1, 3, 6, 11, 15, 21, 30 as Iap2ServerApp does
+vst = 0x30b54
+for i in range(13):
+    pid = struct.unpack('<H', mu.mem_read(B+vst+24*i+2, 2))[0]
+    mu.mem_write(B+vst+24*i, struct.pack('<H', 1 if pid in (0, 1, 3, 6, 11, 15, 21, 30) else 0))
+gp = (struct.unpack('<I', mu.mem_read(B+0x1192c,4))[0] + 0x118a0+4 - 1) & 0xffffffff
+r = build(vst, 13, gp)
+print('VehicleStatus', r)
+assert [p for p, v in r[2]] == [0, 1, 3, 6, 21, 11, 30, 15], r
+print('\n'.join(sorted(set(logs))))
+assert any('VehicleStatus param 30 declared' in l for l in logs)
 print('OK')

@@ -9,6 +9,22 @@
     .thumb
     .text
 
+@ LOG fmt: log "<fmt>" with r0 (the parameter id) through the library's own
+@ iAP2InterfaceLogError (always on: logcat E/iAP2). Keeps r0-r3, lr and [sp].
+    .macro LOG fmt
+    push    {r0-r4, lr}
+    mov     r1, r0
+    adr     r0, \fmt
+    ldr     r4, 8f
+9:  add     r4, pc
+    blx     r4
+    pop     {r0-r4, lr}
+    b       10f
+    .p2align 2
+8:  .word   STOCK_LOG_ERROR - (9b + 4)
+10:
+    .endm
+
 @ ---------------------------------------------------------------------------
 @ VehicleInformation identification: GetPointer wrapper.
 @ (id, type, u16 *idx, session *ctx, [sp] int *more) -> value pointer
@@ -21,6 +37,11 @@
     .thumb_func
 ev_vinfo_getptr:
     cmp     r0, #2
+    beq     11f
+    cmp     r0, #11
+    bne     12f
+11: LOG     ev_msg_vinfo
+12: cmp     r0, #2
     beq     1f
     cmp     r0, #11
     beq     2f
@@ -62,6 +83,7 @@ ev_vinfo_getptr:
     .type ev_status_getptr, %function
     .thumb_func
 ev_status_getptr:
+    LOG     ev_msg_status
     push    {r4, r5}
     adr     r4, ev_status_ids
     movs    r5, #0
@@ -88,6 +110,30 @@ ev_status_getptr:
     .p2align 2
 5:  .word   ev_status_values - (4b + 4)
 6:  .word   STOCK_STATUS_UPDATES_GETPTR - (7b + 4)
+
+@ ---------------------------------------------------------------------------
+@ VehicleStatus identification: log every parameter the library declares, then
+@ the stock iAP2ControlIden_VehicleStatusGetPointer.
+    .global ev_vstat_getptr
+    .type ev_vstat_getptr, %function
+    .thumb_func
+ev_vstat_getptr:
+    LOG     ev_msg_vstat
+    ldr     ip, 6f
+7:  add     ip, pc
+    bx      ip
+    .p2align 2
+6:  .word   STOCK_VSTAT_IDEN_GETPTR - (7b + 4)
+
+    .p2align 2
+ev_msg_vinfo:
+    .asciz  "Leafia EV: identification VehicleInformation param %d sent\n"
+    .p2align 2
+ev_msg_vstat:
+    .asciz  "Leafia EV: identification VehicleStatus param %d declared\n"
+    .p2align 2
+ev_msg_status:
+    .asciz  "Leafia EV: VehicleStatusUpdate param %d\n"
 
     .p2align 2
 ev_engine_type:

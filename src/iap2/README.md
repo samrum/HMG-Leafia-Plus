@@ -31,6 +31,12 @@ The stock Telechips stack sends none of the EV parts. Two patches:
   `patches/neev/libiap2session.ev.lpd` (part `3_bridge`, which backs up and
   restores the stock library).
 
+Every EV field the library writes is also logged as an error-level line with
+tag `iAP2` (`Leafia EV: identification VehicleInformation param N sent`,
+`... VehicleStatus param N declared`, `Leafia EV: VehicleStatusUpdate param N`),
+through the library's own `iAP2InterfaceLogError`, so a capture shows whether
+the fields reached the packet without turning on the library's debug logs.
+
 **Test only:** the values are fixed (15 %, 60 km of 400 km, 11.6 of 77.4 kWh,
 not charging), not the car's. Reading them from the car (`HEVManager`, read
 only) and sending updates every 30 s is the next step if this works.
