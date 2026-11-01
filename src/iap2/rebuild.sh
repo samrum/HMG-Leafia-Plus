@@ -19,7 +19,9 @@ W=$(mktemp -d)
 trap 'rm -rf "$W"' EXIT
 git -C "$ROOT" show "$BASE_REF:patches/$SET/Iap2ServerApp.bridge.lpd" > "$W/base.lpd"
 "$LP" delta "$W/base.lpd" "$ODEX" "$W/base.dex" > /dev/null
-python3 -I "$HERE/ev_engine.py" "$W/base.dex" "$W/classes.dex"
+# TEST ONLY: --mock-status sends fixed range/temperature values (not the car's).
+# Drop it before this goes to main.
+python3 -I "$HERE/ev_engine.py" "$W/base.dex" "$W/classes.dex" --mock-status
 OUT="$ROOT/patches/$SET/Iap2ServerApp.bridge.lpd"
 got=$(md5sum < "$W/classes.dex" | cut -d' ' -f1)
 if [ "$CHECK" = --check ]; then

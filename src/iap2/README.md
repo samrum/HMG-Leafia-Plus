@@ -14,7 +14,14 @@ and the value read with 2, in place (`const/4` + `nop`, same size).
 
 This is an experiment: whether iOS does anything different for an "electric"
 CarPlay head unit (Apple Maps EV routing is known to need automaker
-integration as well). VehicleStatus (range, charge) is still off.
+integration as well).
+
+**Test only, for now:** `rebuild.sh` also passes `--mock-status`, which turns on
+the iAP2 VehicleStatus component with fixed values (range 300 km, outside
+temperature 20 °C, range warning off), not the car's. The iAP2 library sends
+them when the phone starts vehicle-status updates (DiPO logs
+`onVehicleStatusStart()` then). iAP2 has no car battery-percentage field; range
+is the closest. Drop `--mock-status` before this goes to main.
 
 ```
 tools/lpatch/build.sh

@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 """Make the iAP2 identification say the car is electric (Iap2ServerApp).
 
-usage: ev_engine.py <in classes.dex> <out classes.dex>
+usage: ev_engine.py <in classes.dex> <out classes.dex> [--mock-status]
 
 The head unit sends a VehicleInformation component during iAP2 identification
 (Iap2InitInformationMsg.getVehicelInformationGroup). Its EngineType parameter
@@ -19,8 +19,20 @@ This rewrites two instructions in that method, in place and at the same size:
 The bytes around both instructions must occur exactly once, so another build
 stops the script instead of patching the wrong place. The dex checksum and
 signature are recomputed.
+
+--mock-status (test only) also turns on the VehicleStatus component with FIXED
+values, not the car's: the identification then offers Range (id 3), outside
+temperature (4) and range warning (6), and when the phone starts vehicle-status
+updates the iAP2 library answers with the defaults from getVehicleDefaultValue,
+which become Range MOCK_RANGE_KM, temperature MOCK_TEMP_C, warning off.
+In <clinit>, `sput v1 (0)` becomes `sput v2 (1)` for iAP2UsedVehicleStatus and
+the three Support flags; in getVehicleDefaultValue the three `sget` reads become
+`const/16` (same size).
 """
 import hashlib, struct, sys, zlib
+
+MOCK_RANGE_KM = 300
+MOCK_TEMP_C = 20
 
 
 def field_index(d, cls, name):
@@ -47,8 +59,35 @@ def field_index(d, cls, name):
     return hits[0]
 
 
+def once(d, pat, lo=0, hi=None, what=''):
+    hi = len(d) if hi is None else hi
+    hits = [i for i in range(lo, hi - len(pat) + 1) if d.startswith(pat, i)]
+    if len(hits) != 1:
+        sys.exit('%s: anchor found %d times (expected 1): unknown Iap2ServerApp build' % (what, len(hits)))
+    return hits[0]
+
+
+def mock_status(d, cls):
+    f = lambda n: struct.pack('<H', field_index(d, cls, n))
+    # <clinit>: const/16 v4, 127 ; const/16 v3, 63 ; const/4 v2, 1 ; const/4 v1, 0
+    start = once(d, bytes.fromhex('13047f0013033f0012121201'), what='<clinit>')
+    for name in ('iAP2UsedVehicleStatus', 'iAP2VehicleStatusSupportRange',
+                 'iAP2VehicleStatusSupportRangeOutsideTemperature',
+                 'iAP2VehicleStatusSupportRangeWarning'):
+        at = once(d, b'\x67\x01' + f(name), start, start + 0x200, name)
+        d[at + 1] = 0x02                                     # sput v2 (1)
+    # getVehicleDefaultValue: the three value reads, each followed by its aput
+    for name, reg, val in (('iAP2VehicleStatusRange', 4, MOCK_RANGE_KM),
+                           ('iAP2VehicleStatusOutsideTemperature', 3, MOCK_TEMP_C),
+                           ('iAP2VehicleStatusRangeWarning', 4, 0)):
+        pat = bytes([0x60, reg]) + f(name) + bytes([0x4b, reg])
+        at = once(d, pat, what=name)
+        d[at:at + 4] = bytes([0x13, reg]) + struct.pack('<h', val)   # const/16 vX, val
+    print('VehicleStatus on, mock range %d km, %d C, no warning' % (MOCK_RANGE_KM, MOCK_TEMP_C))
+
+
 def main():
-    if len(sys.argv) != 3:
+    if len(sys.argv) not in (3, 4) or (len(sys.argv) == 4 and sys.argv[3] != '--mock-status'):
         sys.exit(__doc__)
     d = bytearray(open(sys.argv[1], 'rb').read())
     if d[:4] != b'dex\n':
@@ -69,6 +108,8 @@ def main():
     at = hits[0]
     d[at:at + 4] = bytes([0x12, 0x11, 0x00, 0x00])            # const/4 v1, 1 ; nop
     d[at + 14:at + 18] = bytes([0x12, 0x23, 0x00, 0x00])      # const/4 v3, 2 ; nop
+    if len(sys.argv) == 4:
+        mock_status(d, cls)
     d[12:32] = hashlib.sha1(bytes(d[32:])).digest()
     d[8:12] = struct.pack('<I', zlib.adler32(bytes(d[12:])) & 0xffffffff)
     open(sys.argv[2], 'wb').write(d)
