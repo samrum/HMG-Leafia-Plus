@@ -16,6 +16,7 @@ and labelled its Wi-Fi tab "Wi-Fi Hotspot".
 |---|---|
 | Opening the screen keeps the phone projection hotspot (AP mode 2) | `WifiClientSettings.onResume` -> `LeafiaWifi.stopApOnOpen` |
 | The switch runs on its own thread: on = stop the hotspot, wait for it to report stopped + 1.5 s, start the client (on "Error": client off, hotspot back); off = client off, then the projection hotspot back | `ac.onPreferenceChange` -> `LeafiaWifi.toggle` |
+| After the hotspot is back, reconnect the phone's Bluetooth (not during a call): the phone is only handed the hotspot when it connects over Bluetooth, and it went back to plain Bluetooth while the client ran | `LeafiaBtReconnect` (binder calls to Broadcom's `IHfDeviceBTCMService`: 0x1c HFP device, 4 disconnect, 3 connect) |
 | Wi-Fi tab label: `string/wifi_settings` ("Wi-Fi", every language the app has) instead of `tab_menu_wifi_hotspot` | `settings/ui/NetworkConnectionSettings` |
 
 `LeafiaWifi` logs with the tag `LeafiaWifi` (the kit's `logcat-network.txt` includes it).

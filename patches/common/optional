@@ -12,4 +12,4 @@
 # HKMC_WifiSettings (whenever the unit has the Android Wi-Fi feature): the Wi-Fi screen keeps the CarPlay/AA
 # hotspot when it opens, switches between it and the client without the stock "Error", and labels
 # its tab "Wi-Fi". One line per stock APK (tools/mkwifi.py).
-6_wifi app HKMC_WifiSettings common/HKMC_WifiSettings.wifi.164039dd.lpd 60117cc0e94280a8b1fc5c18033c7a34
+6_wifi app HKMC_WifiSettings common/HKMC_WifiSettings.wifi.164039dd.lpd ae427e14c20160a00393bc4d57874c60

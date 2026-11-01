@@ -17,7 +17,10 @@
 #        "Error" with Wi-Fi and the hotspot both dead until a restart. If it still
 #        ends in "Error", turn the client off and bring the hotspot back.
 #   off: stop the client, wait until it reports off, then bring the projection
-#        hotspot back (stock left it off until the phone's next Bluetooth connection).
+#        hotspot back (stock left it off until the phone's next Bluetooth connection)
+#        and reconnect the phone's Bluetooth (LeafiaBtReconnect): wireless CarPlay/AA
+#        only hand the phone the hotspot when it connects over Bluetooth, and by then
+#        it has long been back on Bluetooth.
 # stopApOnOpen(): stock WifiClientSettings.onResume stopped any running hotspot;
 #   this keeps the phone projection one, so just opening the screen doesn't drop CarPlay.
 #
@@ -64,6 +67,7 @@
 #       if (!pm.hasSystemFeature(CARPLAY_WIRELESS) && !pm.hasSystemFeature(AA_WIRELESS)) return;
 #       Log.i(TAG, "Leafia: bringing the phone projection hotspot back");
 #       wm.setWifiApEnabledForConnectivity(wm.getWifiApConfiguration(), true);
+#       LeafiaBtReconnect.start(ctx, wm);   // the phone only rejoins after a Bluetooth reconnect
 #   }
 
 # instance fields
@@ -89,7 +93,7 @@
     return-void
 .end method
 
-.method private static log(Ljava/lang/String;)V
+.method static log(Ljava/lang/String;)V
     .registers 2
 
     const-string v0, "LeafiaWifi"
@@ -99,7 +103,7 @@
     return-void
 .end method
 
-.method private static nap(J)V
+.method static nap(J)V
     .registers 2
 
     :try_start_0
@@ -113,7 +117,7 @@
 
 # waitFor(wm, ap, want, tries): poll the hotspot state (ap) or the Wi-Fi state
 # every 200 ms until it is <want>; false after <tries> polls
-.method private static waitFor(Landroid/net/wifi/WifiManager;ZII)Z
+.method static waitFor(Landroid/net/wifi/WifiManager;ZII)Z
     .registers 8
 
     const/4 v0, 0x0
@@ -263,6 +267,10 @@
     const/4 v2, 0x1
 
     invoke-virtual {v0, v1, v2}, Landroid/net/wifi/WifiManager;->setWifiApEnabledForConnectivity(Landroid/net/wifi/WifiConfiguration;Z)Z
+
+    iget-object v1, p0, Lcom/hkmc/wifisettings/LeafiaWifi;->ctx:Landroid/content/Context;
+
+    invoke-static {v1, v0}, Lcom/hkmc/wifisettings/LeafiaBtReconnect;->start(Landroid/content/Context;Landroid/net/wifi/WifiManager;)V
 
     return-void
 .end method
