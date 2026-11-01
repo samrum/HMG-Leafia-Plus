@@ -1,35 +1,52 @@
-# iAP2 identification change (Iap2ServerApp)
+# EV identification for CarPlay (test build, US Ioniq 5)
 
-`patches/neev/Iap2ServerApp.bridge.lpd` is the upstream bridge build of the
-iAP2 server with one change, made by `ev_engine.py`: the VehicleInformation
-component that the head unit sends during iAP2 identification now carries
-EngineType = Electric (2).
+Goal: have the iPhone treat the car as an electric vehicle, as DiPlay (an open
+CarPlay receiver for BYD head units) gets it to: the iPhone then starts vehicle
+status updates (0xA100) and Apple Maps can warn at low charge and offer
+chargers. Full charging-stop routing is not promised.
 
-Stock code builds that component in
-`com.tcc.iap2server.Iap2InitInformationMsg.getVehicelInformationGroup` but gates
-the EngineType parameter on an instance flag (`iAP2UsedViehicleInfoEngineType`)
-that is only ever 0, so the iPhone was never told the engine type. There is no
-`persist.sys.iap2.*` property for it. The patch replaces the flag read with 1
-and the value read with 2, in place (`const/4` + `nop`, same size).
+An iPhone decides this once, from the iAP2 identification. It needs:
 
-This is an experiment: whether iOS does anything different for an "electric"
-CarPlay head unit (Apple Maps EV routing is known to need automaker
-integration as well).
+| Identification component | Parameters |
+|---|---|
+| VehicleInformation (20) | EngineType = Electric (2), SupportedChargingConnectors (11, repeated) |
+| VehicleStatus (21) | Range 3, RangeWarning 6, RangeElectric 11, RangeWarningElectric 15, ElectricChargeInfo 21, MaxRangeInfo 30 |
 
-**Test only, for now:** `rebuild.sh` also passes `--mock-status`, which turns on
-the iAP2 VehicleStatus component with fixed values (range 300 km, outside
-temperature 20 °C, range warning off), not the car's. The iAP2 library sends
-them when the phone starts vehicle-status updates (DiPO logs
-`onVehicleStatusStart()` then). iAP2 has no car battery-percentage field; range
-is the closest. Drop `--mock-status` before this goes to main.
+and answers 0xA100 with a VehicleStatusUpdate (0xA101): 3, 6, 11, 15, battery
+Wh 21/22/23 (min, current, max), displayed percentage x1000 (24), charging (25),
+max range (30). (Parameter numbers from DiPlay, GPL-3; no code taken from it.)
+
+The stock Telechips stack sends none of the EV parts. Two patches:
+
+- `ev_engine.py` (Iap2ServerApp's dex, in place, same size): EngineType
+  Electric; with `--ev-status` it also turns on the VehicleStatus component and
+  its Support flags for 3, 6, 11, 15 and two unused ones whose ids become 21
+  and 30.
+- `evnative/ev_native.py` (`libiap2session.so`): adds two segments with code
+  (`evnative/ev.S`) and bigger tables, and re-points the stock code at them:
+  charging connectors CCS1 and J1772, EngineType always Electric, the VehicleStatus
+  identification table takes ids 21 and 30, and every 0xA101 carries the ten
+  parameters above. No relocations are added; every patched site is checked
+  against the stock bytes first. The library delta is
+  `patches/neev/libiap2session.ev.lpd` (part `3_bridge`, which backs up and
+  restores the stock library).
+
+**Test only:** the values are fixed (15 %, 60 km of 400 km, 11.6 of 77.4 kWh,
+not charging), not the car's. Reading them from the car (`HEVManager`, read
+only) and sending updates every 30 s is the next step if this works.
+
+Checked off-car: the patched library's packet encoder, run under an ARM
+emulator (unicorn), writes VehicleInformation with EngineType 2 and connectors
+0 and 2, and the full 0xA101 above; the mock head unit installs and uninstalls
+it byte-exact. Not yet run on a car.
 
 ```
 tools/lpatch/build.sh
 pip install --require-hashes -r tools/requirements.txt
-src/iap2/rebuild.sh neev <stock Iap2ServerApp.odex>           # writes the .lpd
-src/iap2/rebuild.sh neev <stock Iap2ServerApp.odex> --check   # only verifies it
+apt install binutils-arm-linux-gnueabi
+src/iap2/rebuild.sh neev <stock Iap2ServerApp.odex> <stock libiap2session.so>           # writes both .lpd
+src/iap2/rebuild.sh neev <stock Iap2ServerApp.odex> <stock libiap2session.so> --check   # only verifies
 ```
 
-Then put the rebuilt APK's md5 (stock APK + the new classes.dex through
-`lpatch zipadd`) in the 3_bridge Iap2ServerApp line of `patches/neev/manifest`
+Then put the printed md5s in the 3_bridge lines of `patches/neev/manifest`
 and run `tools/compat-built.py`.

@@ -160,11 +160,14 @@
           "ae427e14c20160a00393bc4d57874c60"
         ],
         "/system/app/Iap2ServerApp.apk": [
-          "7e90fa7d8a161ade71e11dc15e56c410",
-          "cea8a8da3177b3433d3943a87ad88de3"
+          "1982bff4fc0ad5302b4997a7d18c6fb8",
+          "7e90fa7d8a161ade71e11dc15e56c410"
         ],
         "/system/lib/libautoreceiver_infobank.so": [
           "c08410a8d32a615b1aa805cd8a243d52"
+        ],
+        "/system/lib/libiap2session.so": [
+          "6d78c286aaf42fa33b665e18c79b7558"
         ]
       }
     },

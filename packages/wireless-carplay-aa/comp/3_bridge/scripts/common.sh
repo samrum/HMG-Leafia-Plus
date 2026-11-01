@@ -580,3 +580,92 @@ restore_core() {
     log "restored stock $_p"
     return 0
 }
+
+# ---- EV test build of libiap2session.so (only on a car whose manifest lists a
+# 3_bridge libiap2session.so line): declares the car as an EV in iAP2 and
+# answers vehicle status requests with fixed test values. Installed from the
+# build dir after a stock checksum check; uninstall writes the stock file back.
+IAP_LIB=/system/lib/libiap2session.so
+SUM_IAP_LIB=$(built_sum 3_bridge libiap2session.so)
+SUM_IAP_LIB_STOCK=$(stock_sum libiap2session.so)
+if [ -z "$SUM_IAP_LIB" ] && [ -s "$BACKUP_DIR/iaplib.sums" ]; then
+    . "$BACKUP_DIR/iaplib.sums"
+fi
+
+iaplib_wanted() {
+    [ -n "$SUM_IAP_LIB" ]
+}
+
+iaplib_applied() {
+    iaplib_wanted && sum_eq "$IAP_LIB" "$SUM_IAP_LIB"
+}
+
+check_iaplib() {
+    iaplib_wanted || return 0
+    sum_is "$FILES/libiap2session.so" "$SUM_IAP_LIB" || return 1
+    if iaplib_applied; then
+        log "libiap2session.so EV test build already live"
+    elif sum_eq "$IAP_LIB" "$SUM_IAP_LIB_STOCK"; then
+        log "libiap2session.so is stock - ok"
+    else
+        log "FAIL: $IAP_LIB is neither stock nor this package's build ($(file_md5 $IAP_LIB))"
+        return 1
+    fi
+    return 0
+}
+
+snapshot_iaplib() {
+    iaplib_wanted || return 0
+    mkdir -p "$BACKUP_DIR" 2>/dev/null || true
+    {
+        echo "SUM_IAP_LIB=$SUM_IAP_LIB" &&
+        echo "SUM_IAP_LIB_STOCK=$SUM_IAP_LIB_STOCK"
+    } > "$BACKUP_DIR/iaplib.sums" || return 1
+    if [ -s "$BACKUP_DIR/libiap2session.so" ]; then
+        log "snapshot exists for libiap2session.so - keeping original"
+        return 0
+    fi
+    if ! sum_eq "$IAP_LIB" "$SUM_IAP_LIB_STOCK"; then
+        log "FAIL: $IAP_LIB is not stock, refusing to snapshot"
+        return 1
+    fi
+    cp -f "$IAP_LIB" "$BACKUP_DIR/libiap2session.so" || return 1
+    if ! cmp "$IAP_LIB" "$BACKUP_DIR/libiap2session.so" >/dev/null 2>&1; then
+        log "FAIL: snapshot of $IAP_LIB mismatch"
+        return 1
+    fi
+    log "backed up $IAP_LIB"
+    return 0
+}
+
+apply_iaplib() {
+    iaplib_wanted || return 0
+    if iaplib_applied; then
+        log "libiap2session.so EV test build already live"
+        return 0
+    fi
+    if ! put_lib "$FILES/libiap2session.so" "$IAP_LIB" || ! iaplib_applied; then
+        log "FAIL: could not write $IAP_LIB"
+        return 1
+    fi
+    log "OK: $IAP_LIB EV test build (fixed test values: EV, CCS1+J1772, 15%, 60 of 400 km)"
+    return 0
+}
+
+# restore_iaplib: needs /system rw
+restore_iaplib() {
+    if [ ! -s "$BACKUP_DIR/libiap2session.so" ]; then
+        log "no libiap2session.so snapshot - nothing to restore"
+        return 0
+    fi
+    if ! iaplib_applied; then
+        log "WARN: live libiap2session.so is not this package's build - leaving it alone"
+        return 0
+    fi
+    if ! put_lib "$BACKUP_DIR/libiap2session.so" "$IAP_LIB"; then
+        log "FAIL: restore $IAP_LIB"
+        return 1
+    fi
+    log "restored stock $IAP_LIB"
+    return 0
+}

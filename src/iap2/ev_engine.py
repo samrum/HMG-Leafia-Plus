@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 """Make the iAP2 identification say the car is electric (Iap2ServerApp).
 
-usage: ev_engine.py <in classes.dex> <out classes.dex> [--mock-status]
+usage: ev_engine.py <in classes.dex> <out classes.dex> [--ev-status]
 
 The head unit sends a VehicleInformation component during iAP2 identification
 (Iap2InitInformationMsg.getVehicelInformationGroup). Its EngineType parameter
@@ -20,19 +20,16 @@ The bytes around both instructions must occur exactly once, so another build
 stops the script instead of patching the wrong place. The dex checksum and
 signature are recomputed.
 
---mock-status (test only) also turns on the VehicleStatus component with FIXED
-values, not the car's: the identification then offers Range (id 3), outside
-temperature (4) and range warning (6), and when the phone starts vehicle-status
-updates the iAP2 library answers with the defaults from getVehicleDefaultValue,
-which become Range MOCK_RANGE_KM, temperature MOCK_TEMP_C, warning off.
-In <clinit>, `sput v1 (0)` becomes `sput v2 (1)` for iAP2UsedVehicleStatus and
-the three Support flags; in getVehicleDefaultValue the three `sget` reads become
-`const/16` (same size).
+--ev-status (test, goes with the native EV build of libiap2session.so, see
+evnative/) also declares the VehicleStatus component the way an EV needs it:
+in <clinit>, `sput v1 (0)` becomes `sput v2 (1)` for iAP2UsedVehicleStatus and
+the Support flags for Range (3), RangeWarning (6), RangeElectric (11),
+RangeWarningElectric (15), RangeGasoline and RangeCNG; in
+getVehicelStatusGroup the ids sent for those last two, 9 and 12, become 21
+(ElectricChargeInfo) and 30 (MaxRangeInfo), which the native build accepts
+in their place. The values themselves come from the native build.
 """
 import hashlib, struct, sys, zlib
-
-MOCK_RANGE_KM = 300
-MOCK_TEMP_C = 20
 
 
 def field_index(d, cls, name):
@@ -67,27 +64,27 @@ def once(d, pat, lo=0, hi=None, what=''):
     return hits[0]
 
 
-def mock_status(d, cls):
+def ev_status(d, cls):
     f = lambda n: struct.pack('<H', field_index(d, cls, n))
     # <clinit>: const/16 v4, 127 ; const/16 v3, 63 ; const/4 v2, 1 ; const/4 v1, 0
     start = once(d, bytes.fromhex('13047f0013033f0012121201'), what='<clinit>')
     for name in ('iAP2UsedVehicleStatus', 'iAP2VehicleStatusSupportRange',
-                 'iAP2VehicleStatusSupportRangeOutsideTemperature',
-                 'iAP2VehicleStatusSupportRangeWarning'):
+                 'iAP2VehicleStatusSupportRangeWarning', 'iAP2VehicleStatusSupportRangeElectric',
+                 'iAP2VehicleStatusSupportRangeWarningElectric',
+                 'iAP2VehicleStatusSupportRangeGasoline', 'iAP2VehicleStatusSupportRangeCNG'):
         at = once(d, b'\x67\x01' + f(name), start, start + 0x200, name)
         d[at + 1] = 0x02                                     # sput v2 (1)
-    # getVehicleDefaultValue: the three value reads, each followed by its aput
-    for name, reg, val in (('iAP2VehicleStatusRange', 4, MOCK_RANGE_KM),
-                           ('iAP2VehicleStatusOutsideTemperature', 3, MOCK_TEMP_C),
-                           ('iAP2VehicleStatusRangeWarning', 4, 0)):
-        pat = bytes([0x60, reg]) + f(name) + bytes([0x4b, reg])
-        at = once(d, pat, what=name)
-        d[at:at + 4] = bytes([0x13, reg]) + struct.pack('<h', val)   # const/16 vX, val
-    print('VehicleStatus on, mock range %d km, %d C, no warning' % (MOCK_RANGE_KM, MOCK_TEMP_C))
+    # getVehicelStatusGroup: sget vX, flag ; if-eqz v1, +7 ; const/16 v1, <id>
+    for name, old, new in (('iAP2VehicleStatusSupportRangeGasoline', 9, 21),
+                           ('iAP2VehicleStatusSupportRangeCNG', 12, 30)):
+        pat = b'\x60\x01' + f(name) + bytes.fromhex('38010700') + b'\x13\x01' + struct.pack('<H', old)
+        at = once(d, pat, what=name + ' id')
+        d[at + 10:at + 12] = struct.pack('<H', new)
+    print('VehicleStatus on: ids 3, 6, 11, 15, 21, 30')
 
 
 def main():
-    if len(sys.argv) not in (3, 4) or (len(sys.argv) == 4 and sys.argv[3] != '--mock-status'):
+    if len(sys.argv) not in (3, 4) or (len(sys.argv) == 4 and sys.argv[3] != '--ev-status'):
         sys.exit(__doc__)
     d = bytearray(open(sys.argv[1], 'rb').read())
     if d[:4] != b'dex\n':
@@ -109,7 +106,7 @@ def main():
     d[at:at + 4] = bytes([0x12, 0x11, 0x00, 0x00])            # const/4 v1, 1 ; nop
     d[at + 14:at + 18] = bytes([0x12, 0x23, 0x00, 0x00])      # const/4 v3, 2 ; nop
     if len(sys.argv) == 4:
-        mock_status(d, cls)
+        ev_status(d, cls)
     d[12:32] = hashlib.sha1(bytes(d[32:])).digest()
     d[8:12] = struct.pack('<I', zlib.adler32(bytes(d[12:])) & 0xffffffff)
     open(sys.argv[2], 'wb').write(d)
