@@ -1,8 +1,10 @@
 # Wi-Fi settings fix (HKMC_WifiSettings, part 6_wifi)
 
 Source for the code that `patches/common/HKMC_WifiSettings.wifi.<md5>.lpd` adds to the
-stock Wi-Fi settings app (`com.hkmc.wifisettings`). Installed only with the opt-in Wi-Fi
-client (`LEAFIA-WIFI-CLIENT`), and only on a unit whose stock app matches.
+stock Wi-Fi settings app (`com.hkmc.wifisettings`). Installed whenever the unit has the
+Android Wi-Fi feature (`android.hardware.wifi.xml`) after part 1: with the opt-in Wi-Fi client
+(`LEAFIA-WIFI-CLIENT`), or where part 1 adds it for the hotspot (US Ioniq 5, Korean sets);
+and only on a unit whose stock app matches.
 
 The head unit's one radio runs either the hotspot that wireless CarPlay/Android Auto use
 or the Wi-Fi client. Stock, the Wi-Fi screen stopped the projection hotspot as soon as it

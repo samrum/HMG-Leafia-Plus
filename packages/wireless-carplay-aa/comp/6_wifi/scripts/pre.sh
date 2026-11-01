@@ -2,7 +2,7 @@
 . ./scripts/common.sh
 log "preinstall wifi.client"
 if ! wifi_client_on; then
-    log "Wi-Fi client is off (no LEAFIA-WIFI-CLIENT on the install drive) - nothing to do"
+    log "no Wi-Fi screen on this unit (Wi-Fi feature off, no LEAFIA-WIFI-CLIENT) - nothing to do"
     exit 0
 fi
 if [ ! -s "$NEW_APK" ]; then

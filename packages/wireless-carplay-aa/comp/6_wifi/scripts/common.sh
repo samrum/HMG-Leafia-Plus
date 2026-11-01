@@ -8,8 +8,10 @@
 # rebuilt on the unit (scripts/build.sh, patches/common/optional, tools/mkwifi.py) that keeps
 # the hotspot when the screen opens, waits for it to stop before starting the client, brings
 # it back when the client goes off (or fails), and labels the tab "Wi-Fi".
-# Only with the Wi-Fi client on, and only when this unit's HKMC_WifiSettings is the stock
-# file the fix is for; otherwise this part does nothing. Uninstall writes the snapshot back.
+# Only when the Wi-Fi screen can be reached (the android.hardware.wifi feature is on: from
+# the opt-in, or part 1 adding it where the firmware removes the hotspot, as on the US
+# Ioniq 5) and only when this unit's HKMC_WifiSettings is the stock file the fix is for;
+# otherwise this part does nothing. Uninstall writes the snapshot back.
 
 export PATH=/data/nemesis/bin:/sbin:/vendor/bin:/system/sbin:/system/bin:/system/xbin
 export LD_LIBRARY_PATH=/vendor/lib:/system/lib
@@ -22,8 +24,12 @@ LIVE_ODEX=/system/app/$APP.odex
 NEW_APK=/data/nemesis/build/wireless.carplay.aa/6_wifi/$APP.apk
 # part 1 (wireless.projection) records here that it turned the Wi-Fi client on
 WIFI_CLIENT_FLAG=/data/nemesis/backup/wireless.projection/wifi_client
+# the Android Wi-Fi feature: with it the Data/Network screen shows the Wi-Fi tab. Part 1 also
+# adds it without the opt-in where the firmware removes the hotspot feature (US Ioniq 5),
+# so the screen (and the stock bugs) are there either way. Part 1 runs before this part.
+WIFI_FEATURE=/system/etc/permissions/android.hardware.wifi.xml
 
-wifi_client_on() { [ -f "$WIFI_CLIENT_FLAG" ]; }
+wifi_client_on() { [ -f "$WIFI_CLIENT_FLAG" ] || [ -f "$WIFI_FEATURE" ]; }
 
 log() {
     echo "$1"
