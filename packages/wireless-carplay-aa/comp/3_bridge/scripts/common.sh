@@ -19,6 +19,9 @@ CP_XML=/system/etc/permissions/com.hkmc.software.connectivity.carplay_wireless.x
 PROP_FILE=$BACKUP_DIR/props
 # Iap2Server reads these as "t"/"T" = on, "f"/"F" = off, anything else = default (off)
 PROPS="persist.sys.iap2.wifi persist.iap2.iden.wireless"
+# EV TEST BUILD ONLY: the iAP2 library's own debug logs for identification and
+# vehicle status (libiap2osandroid reads "t" = on), to see what reaches the phone.
+PROPS="$PROPS persist.iap2.debug.log persist.iap2.debug.dbg persist.iap2.debug.data persist.iap2.dbg.iden persist.iap2.dbg.vehicle persist.iap2.dbg.control persist.iap2.dbg.ctrlsess"
 PROP_ON=t
 PROP_OFF=f
 # the bridge builds, rebuilt on the unit by scripts/build.sh
