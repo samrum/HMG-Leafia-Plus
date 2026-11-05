@@ -648,7 +648,7 @@ apply_iaplib() {
         log "FAIL: could not write $IAP_LIB"
         return 1
     fi
-    log "OK: $IAP_LIB EV test build (fixed test values: EV, CCS1+J1772, 15%, 60 of 400 km)"
+    log "OK: $IAP_LIB EV test build (fixed test values: EV, CCS1+J1772, 50%, 200 of 400 km, charging + consumption models)"
     return 0
 }
 

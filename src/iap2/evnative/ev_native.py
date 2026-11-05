@@ -35,13 +35,17 @@ The values are FIXED TEST VALUES (below), not the car's. No relocations are
 added: every new pointer is PC-relative. Every patched site is checked
 against the stock bytes first.
 """
-import hashlib, os, struct, subprocess, sys, tempfile
+import hashlib, json, os, struct, subprocess, sys, tempfile
 
 STOCK_MD5 = 'fc7cb675b46a44bd893a1edc054c5e71'   # US Ioniq 5 / EV6 260507
 
 # fixed test values
-VALUES = dict(EV_RANGE_KM=60, EV_CHARGE_WH=11610, EV_CAPACITY_WH=77400,
-              EV_PERCENT_X1000=15000, EV_MAX_RANGE_KM=400)
+VALUES = dict(EV_RANGE_KM=200, EV_CHARGE_WH=38700, EV_CAPACITY_WH=77400,
+              EV_PERCENT_X1000=50000, EV_MAX_RANGE_KM=400,
+              EV_DC_POWER_W=235000, EV_AC_POWER_W=10900)
+EV_NAME = 'Hyundai Ioniq 5'
+# charging (A101 param 26) and consumption (27) models, sent as compact JSON
+CONTRACTS = 'ioniq5-contracts.json'
 
 # stock addresses
 VINFO_IDEN_TABLE = 0x30cec      # idenInfoVehicleInfoGroupList, 5 entries
@@ -58,11 +62,11 @@ NEW_RW_OFF, NEW_RW_VA = 0x36000, 0x38000
 PHNUM = 10
 
 ENTRY = 24
-TYPE_INT16, TYPE_UINT16, TYPE_UINT32, TYPE_ENUM, TYPE_BOOL = 1, 5, 6, 8, 9
+TYPE_INT16, TYPE_UINT16, TYPE_UINT32, TYPE_ENUM, TYPE_BOOL, TYPE_STRING = 1, 5, 6, 8, 9, 10
 SEND_SWITCHED = (4, 9, 10, 12, 13, 14, 16)
 SEND_ALWAYS = ((3, TYPE_UINT16), (6, TYPE_BOOL), (11, TYPE_UINT16), (15, TYPE_BOOL),
                (21, TYPE_UINT32), (22, TYPE_UINT32), (23, TYPE_UINT32), (24, TYPE_UINT32),
-               (25, TYPE_BOOL), (30, TYPE_UINT16))
+               (26, TYPE_STRING), (27, TYPE_STRING), (30, TYPE_UINT16))
 
 HERE = os.path.dirname(os.path.abspath(__file__))
 
@@ -75,9 +79,26 @@ def entry(used, pid, typ):
     return struct.pack('<HHH', used, pid, typ) + bytes(ENTRY - 6)
 
 
+def asciz(label, text):
+    data = text.encode('utf-8')
+    if b'\0' in data or b'"' in data or b'\\' in data:
+        die('string for %s needs escaping' % label)
+    return '    .p2align 2\n    .global %s\n%s:\n    .asciz "%s"\n' % (label, label, data.decode())
+
+
 def build_code(tmp):
     o, elf = os.path.join(tmp, 'ev.o'), os.path.join(tmp, 'ev.elf')
-    asm = ['arm-linux-gnueabi-as', '-mthumb', '-march=armv7-a', '-o', o]
+    c = json.load(open(os.path.join(HERE, CONTRACTS)))
+    compact = lambda k: json.dumps(c[k], separators=(',', ':'))
+    # json.dumps never writes a backslash or a raw quote-free string here: keys and
+    # numbers only; .ascii needs the quotes escaped
+    inc = asciz('ev_name', EV_NAME)
+    for label, key in (('ev_charging_model', 'charging_contract'),
+                       ('ev_consumption_model', 'consumption_contract')):
+        inc += '    .p2align 2\n    .global %s\n%s:\n    .asciz "%s"\n' % (
+            label, label, compact(key).replace('"', '\\"'))
+    open(os.path.join(tmp, 'ev_strings.inc'), 'w').write(inc)
+    asm = ['arm-linux-gnueabi-as', '-mthumb', '-march=armv7-a', '-I', tmp, '-o', o]
     for k, v in VALUES.items():
         asm += ['--defsym', '%s=%d' % (k, v)]
     subprocess.run(asm + [os.path.join(HERE, 'ev.S')], check=True)
@@ -139,9 +160,14 @@ def main():
         pid, typ = struct.unpack_from('<HH', e, 2)
         if (pid, typ) != ((0, 5), (1, 10), (2, 8), (6, 10), (8, 10))[i]:
             die('VehicleInformation table differs from stock')
-        e[8:] = bytes(ENTRY - 8)      # EngineType's init callback: ev.S serves id 2
+        if pid in (2, 6, 8):
+            e[0:2] = b'\x01\x00'    # used
+            e[8:] = bytes(ENTRY - 8)  # no stock callbacks: ev.S serves 2, 6 and 8
         vinfo += e
-    vinfo += entry(1, 11, TYPE_ENUM)  # SupportedChargingConnectors
+    vinfo += entry(1, 11, TYPE_ENUM)    # SupportedChargingConnectors
+    vinfo += entry(1, 12, TYPE_UINT32)  # maximum DC charging power (W)
+    vinfo += entry(1, 14, TYPE_UINT32)  # maximum AC charging power (W)
+    n_vinfo = len(vinfo) // ENTRY
     stock_send = d[SEND_TABLE - DATA_DELTA:SEND_TABLE - DATA_DELTA + 12 * ENTRY]
     want = ((3, 5), (4, 1), (4, 1), (6, 9)) + tuple((i, 9) for i in range(9, 17))
     for i in range(12):
@@ -161,7 +187,7 @@ def main():
 
     # --- VehicleInformation: 6-entry table and the wrapper ---
     lit(0x11a8c, 0x11a16, VINFO_IDEN_TABLE, vinfo_va, 'Iden group list')
-    imm8(0x11a12, 1, 5, 6, 'Iden VehicleInformation count')
+    imm8(0x11a12, 1, 5, n_vinfo, 'Iden VehicleInformation count')
     lit(0x12800, 0x127dc, VINFO_IDEN_TABLE, vinfo_va, 'SetVehicleInfoInit table')
     lit(0x12834, 0x1280c, VINFO_IDEN_TABLE, vinfo_va, 'SetVehicleInfoDone table')
     lit(0x11928, 0x1189a, VINFO_IDEN_GETPTR | 1, syms['ev_vinfo_getptr'] | 1, 'Iden GetPointer')
@@ -210,8 +236,9 @@ def main():
     d += b''.join(struct.pack('<8I', *p) for p in ph) + rx_code
     d += bytes(NEW_RW_OFF - len(d)) + rw
     open(sys.argv[2], 'wb').write(d)
-    print('libiap2session EV test build: connectors CCS1+J1772, %d%% charge, %d km of %d km'
-          % (VALUES['EV_PERCENT_X1000'] // 1000, VALUES['EV_RANGE_KM'], VALUES['EV_MAX_RANGE_KM']))
+    print('libiap2session EV test build: %s, CCS1 %d W + J1772 %d W, %d%% charge, %d km of %d km,'
+          ' charging and consumption models' % (EV_NAME, VALUES['EV_DC_POWER_W'], VALUES['EV_AC_POWER_W'],
+          VALUES['EV_PERCENT_X1000'] // 1000, VALUES['EV_RANGE_KM'], VALUES['EV_MAX_RANGE_KM']))
 
 
 if __name__ == '__main__':

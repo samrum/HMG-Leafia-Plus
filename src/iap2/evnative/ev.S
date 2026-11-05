@@ -29,8 +29,10 @@
 @ VehicleInformation identification: GetPointer wrapper.
 @ (id, type, u16 *idx, session *ctx, [sp] int *more) -> value pointer
 @ id 2  EngineType: Electric (2)
+@ id 6  DisplayName, id 8 MapsDisplayName: EV_NAME
 @ id 11 SupportedChargingConnectors: repeated, one value per call; *more = 1
 @        until the last one, so the packet encoder repeats the entry.
+@ id 12 maximum DC charging power (W), id 14 maximum AC charging power (W)
 @ Every other id goes to the stock iAP2ControlIden_VehicleInfoIdenGetPointer.
     .global ev_vinfo_getptr
     .type ev_vinfo_getptr, %function
@@ -38,23 +40,41 @@
 ev_vinfo_getptr:
     cmp     r0, #2
     beq     11f
+    cmp     r0, #6
+    beq     11f
+    cmp     r0, #8
+    beq     11f
     cmp     r0, #11
+    beq     11f
+    cmp     r0, #12
+    beq     11f
+    cmp     r0, #14
     bne     12f
 11: LOG     ev_msg_vinfo
-12: cmp     r0, #2
+    ldr     r2, [sp]
+    movs    r1, #0
+    str     r1, [r2]                @ *more = 0 (11 sets it again below)
+    cmp     r0, #2
     beq     1f
     cmp     r0, #11
     beq     2f
-    ldr     ip, 6f
+    cmp     r0, #12
+    beq     13f
+    cmp     r0, #14
+    beq     14f
+    ldr     r0, 15f                 @ 6, 8: the name
+16: add     r0, pc
+    bx      lr
+13: adr     r0, ev_dc_power
+    bx      lr
+14: adr     r0, ev_ac_power
+    bx      lr
+12: ldr     ip, 6f
 7:  add     ip, pc
     bx      ip                      @ tail call, arguments untouched
-1:  ldr     r2, [sp]
-    movs    r1, #0
-    str     r1, [r2]
-    adr     r0, ev_engine_type
+1:  adr     r0, ev_engine_type
     bx      lr
-2:  ldr     r2, [sp]
-    ldr     r3, 3f
+2:  ldr     r3, 3f
 4:  add     r3, pc                  @ r3 = &ev_conn_index
     ldr     r1, [r3]
     adr     r0, ev_connectors
@@ -68,11 +88,11 @@ ev_vinfo_getptr:
     bx      lr
 5:  movs    r1, #0
     str     r1, [r3]                @ last one: start over next time
-    str     r1, [r2]
     bx      lr
     .p2align 2
 3:  .word   ev_conn_index - (4b + 4)
 6:  .word   STOCK_VINFO_IDEN_GETPTR - (7b + 4)
+15: .word   ev_name - (16b + 4)
 
 @ ---------------------------------------------------------------------------
 @ VehicleStatusUpdate (0xA101): GetPointer wrapper for the update builders.
@@ -84,6 +104,10 @@ ev_vinfo_getptr:
     .thumb_func
 ev_status_getptr:
     LOG     ev_msg_status
+    cmp     r0, #26
+    beq     20f
+    cmp     r0, #27
+    beq     21f
     push    {r4, r5}
     adr     r4, ev_status_ids
     movs    r5, #0
@@ -107,9 +131,20 @@ ev_status_getptr:
     ldr     ip, 6f
 7:  add     ip, pc
     bx      ip                      @ tail call, arguments untouched
+20: ldr     r0, 22f                 @ 26: charging model (JSON string)
+23: add     r0, pc
+    b       25f
+21: ldr     r0, 24f                 @ 27: consumption model (JSON string)
+26: add     r0, pc
+25: ldr     r2, [sp]
+    movs    r1, #0
+    str     r1, [r2]
+    bx      lr
     .p2align 2
 5:  .word   ev_status_values - (4b + 4)
 6:  .word   STOCK_STATUS_UPDATES_GETPTR - (7b + 4)
+22: .word   ev_charging_model - (23b + 4)
+24: .word   ev_consumption_model - (26b + 4)
 
 @ ---------------------------------------------------------------------------
 @ VehicleStatus identification: log every parameter the library declares, then
@@ -139,13 +174,18 @@ ev_msg_status:
 ev_engine_type:
     .byte   2                       @ Iap2Const.EngineType.Electric
     .p2align 2
+ev_dc_power:
+    .word   EV_DC_POWER_W
+ev_ac_power:
+    .word   EV_AC_POWER_W
+    .p2align 2
 ev_connectors:
     .byte   0, 2                    @ CCS1 (DC), J1772 (AC)
     .equ    EV_CONNECTOR_COUNT, 2
     .p2align 2
 @ order matches ev_status_values; 0 ends the list
 ev_status_ids:
-    .hword  3, 6, 11, 15, 21, 22, 23, 24, 25, 30, 0
+    .hword  3, 6, 11, 15, 21, 22, 23, 24, 30, 0
 
 @ ---------------------------------------------------------------------------
     .data
@@ -166,8 +206,11 @@ ev_status_values:
     .word   EV_CHARGE_WH            @ 22 CurrentBatteryCharge (Wh)
     .word   EV_CAPACITY_WH          @ 23 MaxBatteryCharge (Wh)
     .word   EV_PERCENT_X1000        @ 24 DisplayedBatteryPercentage (% x 1000)
-    .word   0                       @ 25 isCharging
     .word   EV_MAX_RANGE_KM         @ 30 MaxRangeElectric (km)
+
+@ strings written by ev_native.py: the car name and the charging and
+@ consumption models (compact JSON, NUL-terminated)
+    .include "ev_strings.inc"
 
 @ The tables (filled in by ev_native.py) follow in .data at ev_tables.
     .p2align 3

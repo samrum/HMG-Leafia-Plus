@@ -74,16 +74,26 @@ which=('vinfo','send')
 if 'vinfo' in which:
     tbl = struct.unpack('<I', mu.mem_read(B+0x11a8c,4))[0] + 0x11a16+4
     gp = struct.unpack('<I', mu.mem_read(B+0x11928,4))[0] + 0x1189a+4 - 1
-    r = build(tbl & 0xffffffff, 6, gp & 0xffffffff)
+    cnt = mu.mem_read(B+0x11a12,1)[0]
+    r = build(tbl & 0xffffffff, cnt, gp & 0xffffffff)
     print('VehicleInformation', r)
-    assert r[2] == [(0, '0000'), (1, '00'), (2, '02'), (6, '00'), (8, '00'), (11, '00'), (11, '02')], r
+    name = b'Hyundai Ioniq 5\0'.hex()
+    assert r[2] == [(0, '0000'), (1, '00'), (2, '02'), (6, name), (8, name), (11, '00'), (11, '02'),
+                    (12, '%08x' % 235000), (14, '%08x' % 10900)], r
 if 'send' in which:
     tbl = (struct.unpack('<I', mu.mem_read(B+0x15044,4))[0] + 0x15010+4) & 0xffffffff
     cnt = mu.mem_read(B+0x1500e,1)[0]
     gp = (struct.unpack('<I', mu.mem_read(B+0x1504c,4))[0] + 0x15014+4 - 1) & 0xffffffff
     r = build(tbl, cnt, gp)
-    print('A101', r)
-    assert [p for p, v in r[2]] == [3, 6, 11, 15, 21, 22, 23, 24, 25, 30], r
+    print('A101', [(p, v if len(v) < 40 else bytes.fromhex(v)[:40]) for p, v in r[2]])
+    assert [p for p, v in r[2]] == [3, 6, 11, 15, 21, 22, 23, 24, 26, 27, 30], r
+    import json
+    vals = dict(r[2])
+    for pid, mid in ((26, 12582922), (27, 12582921)):
+        raw = bytes.fromhex(vals[pid])
+        assert raw.endswith(b'\0'), pid
+        assert json.loads(raw[:-1])['model_id'] == mid, pid
+    assert vals[24] == '%08x' % 50000 and vals[30] == '%04x' % 400, vals
 # VehicleStatus identification: flag 0, 1, 3, 6, 11, 15, 21, 30 as Iap2ServerApp does
 vst = 0x30b54
 for i in range(13):
