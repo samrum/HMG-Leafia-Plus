@@ -42,7 +42,9 @@ for _p in $PARTS; do
 done
 clean_build
 echo "$PARTS" > "$PARTS_FILE" || log "WARN: could not record installed parts in $PARTS_FILE"
-adb_net_fix
+# an older build switched ADB over network away from the stock setting, which turns it off
+# on these units; put it back (bin/eth0-guard.sh now keeps eth0 out of the hotspot's range)
+adb_net_restore
 apps_release
 sync
 if [ -n "$EV6_TEST_ROOT" ]; then log "test mode - not rebooting"; exit 0; fi

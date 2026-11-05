@@ -2,7 +2,7 @@
 version=1.0
 id=wireless.carplay.aa
 name=HMG Leafia Plus - Wireless CarPlay/AA
-types=application
+types=application,service
 preinstall=scripts/pre.sh
 postinstall=scripts/post.sh
 preuninstall=scripts/preun.sh
@@ -11,3 +11,10 @@ preuninstall=scripts/preun.sh
 kind=sh
 path=bin/status.sh
 uid=root
+
+[service.0]
+name=eth0-guard
+kind=sh
+path=bin/eth0-guard.sh
+uid=root
+mode=restart
