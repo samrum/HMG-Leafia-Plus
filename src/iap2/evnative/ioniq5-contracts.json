@@ -1,0 +1,78 @@
+{
+ "_source": "Charging and consumption models from isaacwisdom/egmp-carplay-ev-routing (GPL-3.0-or-later), vehicles/hyundai/ioniq-5/us-77kwh/profile.json; model ids and dictionaries credited there to augard/evmaps. Estimates, not calibrated.",
+ "charging_contract": {
+  "model_id": 12582922,
+  "vehicle_parameters": {
+   "vehicle_energy_axis_wh": [
+    0,
+    20000,
+    38700,
+    41022,
+    61920,
+    62694,
+    65790,
+    69660,
+    73530,
+    75852,
+    77400
+   ],
+   "vehicle_charge_axis_w": [
+    230000,
+    235000,
+    228000,
+    160000,
+    160000,
+    70000,
+    48500,
+    33500,
+    25500,
+    17000,
+    12000
+   ],
+   "energy_w_per_h": [
+    0,
+    3650,
+    7350,
+    11300,
+    15100,
+    18700,
+    22600,
+    26350,
+    30150,
+    34050,
+    37850,
+    41600,
+    45400,
+    49400,
+    53050,
+    57150,
+    60950,
+    64950,
+    68750,
+    72750,
+    77050
+   ],
+   "efficiency_factor": 0.95
+  }
+ },
+ "consumption_contract": {
+  "model_id": 12582921,
+  "vehicle_parameters": {
+   "vehicle_auxiliary_power_w": 400.0,
+   "vehicle_consumption_values_wh_per_m": [
+    0.2254000186920166,
+    0.18230000734329224,
+    0.19320000410079957,
+    0.21390001773834227,
+    0.1721000075340271,
+    0.1721000075340271,
+    0.18310000896453857,
+    0.2052000045776367,
+    0.2266000032424927,
+    0.25840001106262206
+   ],
+   "vehicle_altitude_gain_consumption_wh_per_m": 6.42,
+   "vehicle_altitude_loss_consumption_wh_per_m": 4.33
+  }
+ }
+}

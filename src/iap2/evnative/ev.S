@@ -1,0 +1,218 @@
+@ Leafia EV status for libiap2session.so (Telechips iAP2 session library).
+@ Linked at fixed addresses by ev_native.py: .text in a new R+X segment,
+@ .data in a new R+W segment. Reached only through PC-relative literals in
+@ the stock code that ev_native.py re-points; no relocations are needed.
+@
+@ TEST VALUES ONLY: fixed numbers, not read from the car.
+
+    .syntax unified
+    .thumb
+    .text
+
+@ LOG fmt: log "<fmt>" with r0 (the parameter id) through the library's own
+@ iAP2InterfaceLogError (always on: logcat E/iAP2). Keeps r0-r3, lr and [sp].
+    .macro LOG fmt
+    push    {r0-r4, lr}
+    mov     r1, r0
+    adr     r0, \fmt
+    ldr     r4, 8f
+9:  add     r4, pc
+    blx     r4
+    pop     {r0-r4, lr}
+    b       10f
+    .p2align 2
+8:  .word   STOCK_LOG_ERROR - (9b + 4)
+10:
+    .endm
+
+@ ---------------------------------------------------------------------------
+@ VehicleInformation identification: GetPointer wrapper.
+@ (id, type, u16 *idx, session *ctx, [sp] int *more) -> value pointer
+@ id 2  EngineType: Electric (2)
+@ id 6  DisplayName, id 8 MapsDisplayName: EV_NAME
+@ id 11 SupportedChargingConnectors: repeated, one value per call; *more = 1
+@        until the last one, so the packet encoder repeats the entry.
+@ id 12 maximum DC charging power (W), id 14 maximum AC charging power (W)
+@ Every other id goes to the stock iAP2ControlIden_VehicleInfoIdenGetPointer.
+    .global ev_vinfo_getptr
+    .type ev_vinfo_getptr, %function
+    .thumb_func
+ev_vinfo_getptr:
+    cmp     r0, #2
+    beq     11f
+    cmp     r0, #6
+    beq     11f
+    cmp     r0, #8
+    beq     11f
+    cmp     r0, #11
+    beq     11f
+    cmp     r0, #12
+    beq     11f
+    cmp     r0, #14
+    bne     12f
+11: LOG     ev_msg_vinfo
+    ldr     r2, [sp]
+    movs    r1, #0
+    str     r1, [r2]                @ *more = 0 (11 sets it again below)
+    cmp     r0, #2
+    beq     1f
+    cmp     r0, #11
+    beq     2f
+    cmp     r0, #12
+    beq     13f
+    cmp     r0, #14
+    beq     14f
+    ldr     r0, 15f                 @ 6, 8: the name
+16: add     r0, pc
+    bx      lr
+13: adr     r0, ev_dc_power
+    bx      lr
+14: adr     r0, ev_ac_power
+    bx      lr
+12: ldr     ip, 6f
+7:  add     ip, pc
+    bx      ip                      @ tail call, arguments untouched
+1:  adr     r0, ev_engine_type
+    bx      lr
+2:  ldr     r3, 3f
+4:  add     r3, pc                  @ r3 = &ev_conn_index
+    ldr     r1, [r3]
+    adr     r0, ev_connectors
+    add     r0, r1                  @ r0 = &ev_connectors[index]
+    adds    r1, #1
+    cmp     r1, #EV_CONNECTOR_COUNT
+    bge     5f
+    str     r1, [r3]
+    movs    r1, #1
+    str     r1, [r2]                @ more to come
+    bx      lr
+5:  movs    r1, #0
+    str     r1, [r3]                @ last one: start over next time
+    bx      lr
+    .p2align 2
+3:  .word   ev_conn_index - (4b + 4)
+6:  .word   STOCK_VINFO_IDEN_GETPTR - (7b + 4)
+15: .word   ev_name - (16b + 4)
+
+@ ---------------------------------------------------------------------------
+@ VehicleStatusUpdate (0xA101): GetPointer wrapper for the update builders.
+@ (id, type, u16 *idx, session *ctx, [sp] int *more) -> value pointer
+@ Ids in ev_status_ids come from ev_status_values; everything else from the
+@ stock iAP2ControlVehicleStatusGetUpdatesPointer.
+    .global ev_status_getptr
+    .type ev_status_getptr, %function
+    .thumb_func
+ev_status_getptr:
+    LOG     ev_msg_status
+    cmp     r0, #26
+    beq     20f
+    cmp     r0, #27
+    beq     21f
+    push    {r4, r5}
+    adr     r4, ev_status_ids
+    movs    r5, #0
+1:  ldrh    r1, [r4, r5]
+    cmp     r1, #0
+    beq     3f                      @ end of list: not ours
+    cmp     r1, r0
+    beq     2f
+    adds    r5, #2
+    b       1b
+2:  ldr     r2, [sp, #8]
+    movs    r1, #0
+    str     r1, [r2]
+    ldr     r0, 5f
+4:  add     r0, pc                  @ r0 = ev_status_values
+    lsls    r5, r5, #1              @ id index * 4
+    add     r0, r5
+    pop     {r4, r5}
+    bx      lr
+3:  pop     {r4, r5}
+    ldr     ip, 6f
+7:  add     ip, pc
+    bx      ip                      @ tail call, arguments untouched
+20: ldr     r0, 22f                 @ 26: charging model (JSON string)
+23: add     r0, pc
+    b       25f
+21: ldr     r0, 24f                 @ 27: consumption model (JSON string)
+26: add     r0, pc
+25: ldr     r2, [sp]
+    movs    r1, #0
+    str     r1, [r2]
+    bx      lr
+    .p2align 2
+5:  .word   ev_status_values - (4b + 4)
+6:  .word   STOCK_STATUS_UPDATES_GETPTR - (7b + 4)
+22: .word   ev_charging_model - (23b + 4)
+24: .word   ev_consumption_model - (26b + 4)
+
+@ ---------------------------------------------------------------------------
+@ VehicleStatus identification: log every parameter the library declares, then
+@ the stock iAP2ControlIden_VehicleStatusGetPointer.
+    .global ev_vstat_getptr
+    .type ev_vstat_getptr, %function
+    .thumb_func
+ev_vstat_getptr:
+    LOG     ev_msg_vstat
+    ldr     ip, 6f
+7:  add     ip, pc
+    bx      ip
+    .p2align 2
+6:  .word   STOCK_VSTAT_IDEN_GETPTR - (7b + 4)
+
+    .p2align 2
+ev_msg_vinfo:
+    .asciz  "Leafia EV: identification VehicleInformation param %d sent\n"
+    .p2align 2
+ev_msg_vstat:
+    .asciz  "Leafia EV: identification VehicleStatus param %d declared\n"
+    .p2align 2
+ev_msg_status:
+    .asciz  "Leafia EV: VehicleStatusUpdate param %d\n"
+
+    .p2align 2
+ev_engine_type:
+    .byte   2                       @ Iap2Const.EngineType.Electric
+    .p2align 2
+ev_dc_power:
+    .word   EV_DC_POWER_W
+ev_ac_power:
+    .word   EV_AC_POWER_W
+    .p2align 2
+ev_connectors:
+    .byte   0, 2                    @ CCS1 (DC), J1772 (AC)
+    .equ    EV_CONNECTOR_COUNT, 2
+    .p2align 2
+@ order matches ev_status_values; 0 ends the list
+ev_status_ids:
+    .hword  3, 6, 11, 15, 21, 22, 23, 24, 30, 0
+
+@ ---------------------------------------------------------------------------
+    .data
+    .p2align 2
+    .global ev_conn_index
+ev_conn_index:
+    .word   0
+
+@ one 4-byte slot per id in ev_status_ids (the encoder reads u16/u32/bool
+@ from the start of the slot, little endian)
+    .global ev_status_values
+ev_status_values:
+    .word   EV_RANGE_KM             @ 3  Range (km)
+    .word   0                       @ 6  RangeWarning
+    .word   EV_RANGE_KM             @ 11 RangeElectric (km)
+    .word   0                       @ 15 RangeWarningElectric
+    .word   0                       @ 21 MinBatteryCharge (Wh)
+    .word   EV_CHARGE_WH            @ 22 CurrentBatteryCharge (Wh)
+    .word   EV_CAPACITY_WH          @ 23 MaxBatteryCharge (Wh)
+    .word   EV_PERCENT_X1000        @ 24 DisplayedBatteryPercentage (% x 1000)
+    .word   EV_MAX_RANGE_KM         @ 30 MaxRangeElectric (km)
+
+@ strings written by ev_native.py: the car name and the charging and
+@ consumption models (compact JSON, NUL-terminated)
+    .include "ev_strings.inc"
+
+@ The tables (filled in by ev_native.py) follow in .data at ev_tables.
+    .p2align 3
+    .global ev_tables
+ev_tables:

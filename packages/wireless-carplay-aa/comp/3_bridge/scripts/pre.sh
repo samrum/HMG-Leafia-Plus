@@ -23,5 +23,6 @@ for _name in HKMC_DiPO Iap2ServerApp; do
 done
 check_sums || exit 1
 check_core || exit 1
+check_iaplib || exit 1
 log "preinstall ok"
 exit 0
