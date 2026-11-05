@@ -20,7 +20,9 @@
 #   MOCK_LEFTOVER_STOPPED=1 start as if an earlier run died with the projection apps stopped
 #   MOCK_USB_DESCRIPTOR=1   put our install descriptor on the mock USB drive
 #   MOCK_ADB_TCP=1          ADB over network on the stock way (as NEMESIS's Enable ADB
-#                           leaves it); checks the switch to persist.adb.tcp.port and back
+#                           leaves it); checks the package leaves it on
+#   MOCK_ADB_SWITCHED=1     as if an older build had switched ADB over network to
+#                           persist.adb.tcp.port; checks install puts the stock setting back
 #   MOCK_WIFI_CLIENT=1      LEAFIA-WIFI-CLIENT on the install drive: part 1 also turns on
 #                           the Wi-Fi client (implies MOCK_USB_DESCRIPTOR=1)
 #   MOCK_NO_WIFI=1          a unit whose Wi-Fi chip never responds (no wlan0, driver
@@ -126,6 +128,11 @@ if [ "$MOCK_LEFTOVER_STOPPED" = 1 ]; then
 fi
 stopped_left() { ls "$X" | grep '^pm_disabled_' | sed 's/^pm_disabled_//' | tr '\n' ' '; }
 [ "$MOCK_ADB_TCP" = 1 ] && echo 1 > "$X/prop_persist.service.adb.tcp.enable"
+if [ "$MOCK_ADB_SWITCHED" = 1 ]; then
+    MOCK_ADB_TCP=1
+    echo 0 > "$X/prop_persist.service.adb.tcp.enable"; echo 5555 > "$X/prop_persist.adb.tcp.port"
+    printf 'enable\nport\n' > "$R/data/nemesis/wireless.carplay.aa.adb"
+fi
 adb_props() { echo "enable=$(cat "$X/prop_persist.service.adb.tcp.enable" 2>/dev/null) port=$(cat "$X/prop_persist.adb.tcp.port" 2>/dev/null)"; }
 cd "$X/pkg"; export LPATCH="$X/stub/lpatch_q"
 ok=1
@@ -137,7 +144,7 @@ if "$SH" scripts/pre.sh > "$X/pre.log" 2>&1; then
         echo "INSTALL FAILED"; grep -i 'fail' "$X/post.log" | head; ok=0
     fi
     if [ "$MOCK_ADB_TCP" = 1 ]; then
-        _a=$(adb_props); echo "adb after install: $_a"; [ "$_a" = "enable=0 port=5555" ] || ok=0
+        _a=$(adb_props); echo "adb after install: $_a"; [ "$_a" = "enable=1 port=" ] || ok=0
     fi
     [ "$MOCK_USB_DESCRIPTOR" = 1 ] && echo "usb drive after install: $(ls "$R/storage/usb0" | tr '\n' ' ')"
     _n=$(grep -c '^disable ' "$X/pm.calls" 2>/dev/null || true); echo "apps stopped for the swap: ${_n:-0}"
