@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Make libiap2session.so declare an electric car to the iPhone (TEST BUILD).
+"""Make libiap2session.so declare an electric car to the iPhone (test build).
 
 usage: ev_native.py <stock libiap2session.so> <out libiap2session.so>
 
@@ -17,32 +17,36 @@ EV (see src/iap2/README.md). This adds two segments to the library:
 
 and re-points PC-relative literals in the stock code at them:
 
-  VehicleInformation (identification param 20): a 6th entry,
-      SupportedChargingConnectors (11), repeated: CCS1 (0) and J1772 (2);
-      EngineType (2) always Electric. Table 5 -> 6 entries.
+  VehicleInformation (identification param 20): EngineType (2) Electric,
+      DisplayName (6) and MapsDisplayName (8), SupportedChargingConnectors
+      (11, repeated: CCS1 0 and J1772 2), maximum DC (12) and AC (14)
+      charging power. Table 5 -> 8 entries.
   VehicleStatus (identification param 21): ids 9 and 12, which the car never
       uses (gasoline and CNG range), become 21 (ElectricChargeInfo) and 30
       (MaxRangeInfo) in place. Iap2ServerApp (ev_engine.py --ev-status) turns
       them on and sends the new ids.
-  VehicleStatusUpdate (0xA101): the send list becomes 7 entries the phone and
-      Iap2ServerApp can switch (4, 9, 10, 12, 13, 14, 16, as before) followed
-      by 10 that are always sent: Range 3, RangeWarning 6, RangeElectric 11,
-      RangeWarningElectric 15, battery Wh 21/22/23, percentage x1000 24,
-      charging 25, MaxRangeElectric 30. Parsers see only the first 7, so
-      nothing clears the always-sent ones.
+  VehicleStatusUpdate (0xA101): the send list becomes
+      - 7 entries the phone and Iap2ServerApp can switch (4, 9, 10, 12, 13,
+        14, 16, as before),
+      - 9 live ones: Range 3, RangeWarning 6, RangeElectric 11,
+        RangeWarningElectric 15, battery Wh 21/22/23, percentage x1000 24,
+        MaxRangeElectric 30. Off until Iap2ServerApp sends them (LeafiaEv,
+        src/iap2/smali, through the stock Iap2SendVehicleStatus JNI call);
+        the stock parser (iAP2ControlVehicleStatusUpdatesSetParam) now
+        covers the first 16 entries and stores them through ev_status_getptr
+        into ev_status_values, then the library sends the update,
+      - 2 always sent: the charging (26) and consumption (27) models.
 
-The values are FIXED TEST VALUES (below), not the car's. No relocations are
-added: every new pointer is PC-relative. Every patched site is checked
-against the stock bytes first.
+The car name, charging power and the two models are fixed (below). No
+relocations are added: every new pointer is PC-relative. Every patched site
+is checked against the stock bytes first.
 """
 import hashlib, json, os, struct, subprocess, sys, tempfile
 
 STOCK_MD5 = 'fc7cb675b46a44bd893a1edc054c5e71'   # US Ioniq 5 / EV6 260507
 
-# fixed test values
-VALUES = dict(EV_RANGE_KM=200, EV_CHARGE_WH=38700, EV_CAPACITY_WH=77400,
-              EV_PERCENT_X1000=50000, EV_MAX_RANGE_KM=400,
-              EV_DC_POWER_W=235000, EV_AC_POWER_W=10900)
+# fixed: charging power (W)
+VALUES = dict(EV_DC_POWER_W=235000, EV_AC_POWER_W=10900)
 EV_NAME = 'Hyundai Ioniq 5'
 # charging (A101 param 26) and consumption (27) models, sent as compact JSON
 CONTRACTS = 'ioniq5-contracts.json'
@@ -64,9 +68,13 @@ PHNUM = 10
 ENTRY = 24
 TYPE_INT16, TYPE_UINT16, TYPE_UINT32, TYPE_ENUM, TYPE_BOOL, TYPE_STRING = 1, 5, 6, 8, 9, 10
 SEND_SWITCHED = (4, 9, 10, 12, 13, 14, 16)
-SEND_ALWAYS = ((3, TYPE_UINT16), (6, TYPE_BOOL), (11, TYPE_UINT16), (15, TYPE_BOOL),
-               (21, TYPE_UINT32), (22, TYPE_UINT32), (23, TYPE_UINT32), (24, TYPE_UINT32),
-               (26, TYPE_STRING), (27, TYPE_STRING), (30, TYPE_UINT16))
+# live values: Iap2ServerApp (src/iap2/smali, LeafiaEv) sends them; the parser
+# keeps them in ev_status_values and turns on the ones it got
+SEND_LIVE = ((3, TYPE_UINT16), (6, TYPE_BOOL), (11, TYPE_UINT16), (15, TYPE_BOOL),
+             (21, TYPE_UINT32), (22, TYPE_UINT32), (23, TYPE_UINT32), (24, TYPE_UINT32),
+             (30, TYPE_UINT16))
+# always sent, fixed: charging and consumption models
+SEND_FIXED = ((26, TYPE_STRING), (27, TYPE_STRING))
 
 HERE = os.path.dirname(os.path.abspath(__file__))
 
@@ -174,8 +182,11 @@ def main():
         if struct.unpack_from('<HH', stock_send, i * ENTRY + 2) != want[i]:
             die('VehicleStatus send list differs from stock')
     send = b''.join(entry(0, pid, TYPE_INT16 if pid == 4 else TYPE_BOOL) for pid in SEND_SWITCHED)
-    send += b''.join(entry(1, pid, typ) for pid, typ in SEND_ALWAYS)
-    n_switched, n_send = len(SEND_SWITCHED), len(SEND_SWITCHED) + len(SEND_ALWAYS)
+    send += b''.join(entry(0, pid, typ) for pid, typ in SEND_LIVE)
+    send += b''.join(entry(1, pid, typ) for pid, typ in SEND_FIXED)
+    n_switched = len(SEND_SWITCHED)
+    n_parsed = n_switched + len(SEND_LIVE)
+    n_send = n_parsed + len(SEND_FIXED)
 
     with tempfile.TemporaryDirectory() as tmp:
         syms, sec = build_code(tmp)
@@ -207,12 +218,14 @@ def main():
     lit(0x14efc, 0x14ef0, SEND_TABLE, send_va, 'StatusFirst')
     imm8(0x14ef2, 2, 12, n_switched, 'StatusFirst count')
     lit(0x14fc8, 0x14fba, SEND_TABLE, send_va, 'UpdatesSetParam')
-    imm8(0x14fbc, 3, 12, n_switched, 'UpdatesSetParam count')
+    imm8(0x14fbc, 3, 12, n_parsed, 'UpdatesSetParam count')
+    # what Iap2ServerApp sends lands in ev_status_values through the wrapper
+    lit(0x14fc4, 0x14fb6, UPDATES_GETPTR | 1, syms['ev_status_getptr'] | 1, 'UpdatesSetParam GetPointer')
     lit(0x14fa8, 0x14f6e, SEND_TABLE, send_va, 'UpdatesAfterStart')
     imm8(0x14f6c, 2, 12, n_send, 'UpdatesAfterStart count')
     lit(0x15044, 0x15010, SEND_TABLE, send_va, 'Updates')
     imm8(0x1500e, 2, 12, n_send, 'Updates count')
-    # the two builders read values through the wrapper (the parser keeps the stock one)
+    # the two builders read values through the wrapper too
     lit(0x14fac, 0x14f72, UPDATES_GETPTR | 1, syms['ev_status_getptr'] | 1, 'UpdatesAfterStart GetPointer')
     lit(0x1504c, 0x15014, UPDATES_GETPTR | 1, syms['ev_status_getptr'] | 1, 'Updates GetPointer')
 
@@ -236,9 +249,8 @@ def main():
     d += b''.join(struct.pack('<8I', *p) for p in ph) + rx_code
     d += bytes(NEW_RW_OFF - len(d)) + rw
     open(sys.argv[2], 'wb').write(d)
-    print('libiap2session EV test build: %s, CCS1 %d W + J1772 %d W, %d%% charge, %d km of %d km,'
-          ' charging and consumption models' % (EV_NAME, VALUES['EV_DC_POWER_W'], VALUES['EV_AC_POWER_W'],
-          VALUES['EV_PERCENT_X1000'] // 1000, VALUES['EV_RANGE_KM'], VALUES['EV_MAX_RANGE_KM']))
+    print('libiap2session EV build: %s, CCS1 %d W + J1772 %d W, charging and consumption models,'
+          ' battery and range from Iap2ServerApp' % (EV_NAME, VALUES['EV_DC_POWER_W'], VALUES['EV_AC_POWER_W']))
 
 
 if __name__ == '__main__':

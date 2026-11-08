@@ -1,7 +1,9 @@
 #!/usr/bin/env python3
 """Off-car check of the EV build of libiap2session.so: runs the library's own
-packet encoder (iAP2SessionPacketSetParamListArrayNew) under an ARM emulator
-with the patched tables and GetPointer functions, and checks what it writes.
+packet encoder (iAP2SessionPacketSetParamListArrayNew) and the vehicle status
+parser (iAP2ControlVehicleStatusUpdatesSetParam, fed a fake Iap2ObjGroup the
+way Iap2ServerApp's parcel arrives) under an ARM emulator with the patched
+tables and GetPointer functions, and checks what they write.
 
 usage: emu_check.py <patched libiap2session.so>      (pip install unicorn)
 """
@@ -28,6 +30,13 @@ CTX=0x20000000; mu.mem_map(CTX, 0x60000)
 STK=0x30000000; mu.mem_map(STK, 0x10000)
 BUF=0x31000000; mu.mem_map(BUF, 0x1000)
 STOP=0x32000000; mu.mem_map(STOP, 0x1000)
+ITEM=0x33000000; mu.mem_map(ITEM, 0x1000)
+ITEMS=[]
+def set_items(items):
+    """items: (id, iAP2 type, int value), as LeafiaEv puts them in the parcel"""
+    ITEMS[:] = items
+    for i, (pid, typ, val) in enumerate(items):
+        mu.mem_write(ITEM + 32 * i, struct.pack('<IIIIi', 0, pid, typ, 1, val))
 def ret(uc, r0=None):
     if r0 is not None: uc.reg_write(UC_ARM_REG_R0, r0)
     uc.reg_write(UC_ARM_REG_PC, uc.reg_read(UC_ARM_REG_LR))
@@ -51,6 +60,10 @@ def hook(uc, addr, size, _):
     elif a == 0xfca8:
         d,s,n=[uc.reg_read(r) for r in (UC_ARM_REG_R0,UC_ARM_REG_R1,UC_ARM_REG_R2)]
         uc.mem_write(d, bytes(uc.mem_read(s,n))); ret(uc,d)
+    elif a == 0xfd38: ret(uc, len(ITEMS))                         # Iap2ObjGroup::getItemCount
+    elif a == 0xfd44: ret(uc, ITEM + 32 * uc.reg_read(UC_ARM_REG_R1))  # getObjItem(i)
+    elif a == 0xfd50:                                             # Iap2ObjItem::getItemInt
+        ret(uc, struct.unpack('<i', uc.mem_read(uc.reg_read(UC_ARM_REG_R0) + 16, 4))[0] & 0xffffffff)
     elif 0xfc7c <= a < 0xffc0: print('unhandled plt', hex(a)); uc.emu_stop()
 mu.hook_add(UC_HOOK_CODE, hook, begin=B, end=B+0x40000)
 def call(fn, args, stack):
@@ -81,19 +94,49 @@ if 'vinfo' in which:
     assert r[2] == [(0, '0000'), (1, '00'), (2, '02'), (6, name), (8, name), (11, '00'), (11, '02'),
                     (12, '%08x' % 235000), (14, '%08x' % 10900)], r
 if 'send' in which:
+    import json
     tbl = (struct.unpack('<I', mu.mem_read(B+0x15044,4))[0] + 0x15010+4) & 0xffffffff
     cnt = mu.mem_read(B+0x1500e,1)[0]
     gp = (struct.unpack('<I', mu.mem_read(B+0x1504c,4))[0] + 0x15014+4 - 1) & 0xffffffff
-    r = build(tbl, cnt, gp)
-    print('A101', [(p, v if len(v) < 40 else bytes.fromhex(v)[:40]) for p, v in r[2]])
-    assert [p for p, v in r[2]] == [3, 6, 11, 15, 21, 22, 23, 24, 26, 27, 30], r
-    import json
-    vals = dict(r[2])
+    def a101():
+        r = build(tbl, cnt, gp)
+        print('A101', [(p, v if len(v) < 40 else bytes.fromhex(v)[:40]) for p, v in r[2]])
+        return r[2]
+    # before Iap2ServerApp sends anything: only the two models
+    out = a101()
+    assert [p for p, v in out] == [26, 27], out
+    vals = dict(out)
     for pid, mid in ((26, 12582922), (27, 12582921)):
         raw = bytes.fromhex(vals[pid])
         assert raw.endswith(b'\0'), pid
         assert json.loads(raw[:-1])['model_id'] == mid, pid
-    assert vals[24] == '%08x' % 50000 and vals[30] == '%04x' % 400, vals
+    # the stock parser, as iAP2SessCtrlUpdateVehicleStatus calls it
+    sp_tbl = (struct.unpack('<I', mu.mem_read(B+0x14fc8,4))[0] + 0x14fba+4) & 0xffffffff
+    sp_cnt = mu.mem_read(B+0x14fbc,1)[0]
+    sp_gp = (struct.unpack('<I', mu.mem_read(B+0x14fc4,4))[0] + 0x14fb6+4 - 1) & 0xffffffff
+    assert sp_tbl == tbl and sp_cnt == 16 and sp_gp == gp, (hex(sp_tbl), sp_cnt, hex(sp_gp))
+    def setparam(items):
+        set_items(items)
+        n = call(0x1abd0, (CTX, 0x33000800, B+sp_tbl, sp_cnt), (B+sp_gp|1,))
+        assert n, 'parser returned 0: no update would be sent'
+    full = [(21, 6, 0), (22, 6, 41234), (23, 6, 64000), (24, 6, 64500),
+            (3, 5, 312), (11, 5, 312), (6, 9, 0), (15, 9, 0), (30, 5, 483)]
+    setparam(full)
+    out = dict(a101())
+    want = {3: '%04x' % 312, 6: '00', 11: '%04x' % 312, 15: '00', 21: '%08x' % 0,
+            22: '%08x' % 41234, 23: '%08x' % 64000, 24: '%08x' % 64500, 30: '%04x' % 483}
+    assert [p for p in out] == [3, 6, 11, 15, 21, 22, 23, 24, 30, 26, 27], out
+    assert {k: out[k] for k in want} == want, out
+    # no range from the car: battery only, range entries off again
+    setparam([(21, 6, 0), (22, 6, 9000), (23, 6, 64000), (24, 6, 14000)])
+    out = dict(a101())
+    assert [p for p in out] == [21, 22, 23, 24, 26, 27], out
+    assert out[24] == '%08x' % 14000, out
+    # the switched ones still go to the stock storage
+    setparam([(4, 1, 1)] + full)
+    out = dict(a101())
+    assert [p for p in out][:1] == [4] and len(out) == 12, out
+    setparam(full)
 # VehicleStatus identification: flag 0, 1, 3, 6, 11, 15, 21, 30 as Iap2ServerApp does
 vst = 0x30b54
 for i in range(13):

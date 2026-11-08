@@ -583,8 +583,9 @@ restore_core() {
 
 # ---- EV test build of libiap2session.so (only on a car whose manifest lists a
 # 3_bridge libiap2session.so line): declares the car as an EV in iAP2 and
-# answers vehicle status requests with fixed test values. Installed from the
-# build dir after a stock checksum check; uninstall writes the stock file back.
+# answers vehicle status requests with the car's battery and range (read by
+# Iap2ServerApp). Installed from the build dir after a stock checksum check;
+# uninstall writes the stock file back.
 IAP_LIB=/system/lib/libiap2session.so
 SUM_IAP_LIB=$(built_sum 3_bridge libiap2session.so)
 SUM_IAP_LIB_STOCK=$(stock_sum libiap2session.so)
@@ -648,7 +649,7 @@ apply_iaplib() {
         log "FAIL: could not write $IAP_LIB"
         return 1
     fi
-    log "OK: $IAP_LIB EV test build (fixed test values: EV, CCS1+J1772, 50%, 200 of 400 km, charging + consumption models)"
+    log "OK: $IAP_LIB EV test build (EV, CCS1+J1772, charging + consumption models, live battery and range from Iap2ServerApp)"
     return 0
 }
 

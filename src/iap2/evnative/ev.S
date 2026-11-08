@@ -3,7 +3,8 @@
 @ .data in a new R+W segment. Reached only through PC-relative literals in
 @ the stock code that ev_native.py re-points; no relocations are needed.
 @
-@ TEST VALUES ONLY: fixed numbers, not read from the car.
+@ Battery and range come from Iap2ServerApp (LeafiaEv) through the stock
+@ VehicleStatusUpdate parser; the rest is fixed.
 
     .syntax unified
     .thumb
@@ -95,17 +96,18 @@ ev_vinfo_getptr:
 15: .word   ev_name - (16b + 4)
 
 @ ---------------------------------------------------------------------------
-@ VehicleStatusUpdate (0xA101): GetPointer wrapper for the update builders.
+@ VehicleStatusUpdate (0xA101): GetPointer wrapper for the update builders
+@ and for the parser of what Iap2ServerApp sends (which writes through it).
 @ (id, type, u16 *idx, session *ctx, [sp] int *more) -> value pointer
 @ Ids in ev_status_ids come from ev_status_values; everything else from the
-@ stock iAP2ControlVehicleStatusGetUpdatesPointer.
+@ stock iAP2ControlVehicleStatusGetUpdatesPointer. Logs once per update
+@ built (id 26 is only in the send list, never parsed).
     .global ev_status_getptr
     .type ev_status_getptr, %function
     .thumb_func
 ev_status_getptr:
-    LOG     ev_msg_status
     cmp     r0, #26
-    beq     20f
+    beq     27f
     cmp     r0, #27
     beq     21f
     push    {r4, r5}
@@ -131,6 +133,7 @@ ev_status_getptr:
     ldr     ip, 6f
 7:  add     ip, pc
     bx      ip                      @ tail call, arguments untouched
+27: LOG     ev_msg_status
 20: ldr     r0, 22f                 @ 26: charging model (JSON string)
 23: add     r0, pc
     b       25f
@@ -168,7 +171,7 @@ ev_msg_vstat:
     .asciz  "Leafia EV: identification VehicleStatus param %d declared\n"
     .p2align 2
 ev_msg_status:
-    .asciz  "Leafia EV: VehicleStatusUpdate param %d\n"
+    .asciz  "Leafia EV: building VehicleStatusUpdate (param %d)\n"
 
     .p2align 2
 ev_engine_type:
@@ -194,19 +197,21 @@ ev_status_ids:
 ev_conn_index:
     .word   0
 
-@ one 4-byte slot per id in ev_status_ids (the encoder reads u16/u32/bool
-@ from the start of the slot, little endian)
+@ one 4-byte slot per id in ev_status_ids (the parser stores an int there,
+@ the encoder reads u16/u32/bool from the start of the slot, little endian).
+@ Zero until Iap2ServerApp sends values; their send-list entries stay off
+@ until then.
     .global ev_status_values
 ev_status_values:
-    .word   EV_RANGE_KM             @ 3  Range (km)
+    .word   0                       @ 3  Range (km)
     .word   0                       @ 6  RangeWarning
-    .word   EV_RANGE_KM             @ 11 RangeElectric (km)
+    .word   0                       @ 11 RangeElectric (km)
     .word   0                       @ 15 RangeWarningElectric
     .word   0                       @ 21 MinBatteryCharge (Wh)
-    .word   EV_CHARGE_WH            @ 22 CurrentBatteryCharge (Wh)
-    .word   EV_CAPACITY_WH          @ 23 MaxBatteryCharge (Wh)
-    .word   EV_PERCENT_X1000        @ 24 DisplayedBatteryPercentage (% x 1000)
-    .word   EV_MAX_RANGE_KM         @ 30 MaxRangeElectric (km)
+    .word   0                       @ 22 CurrentBatteryCharge (Wh)
+    .word   0                       @ 23 MaxBatteryCharge (Wh)
+    .word   0                       @ 24 DisplayedBatteryPercentage (% x 1000)
+    .word   0                       @ 30 MaxRangeElectric (km)
 
 @ strings written by ev_native.py: the car name and the charging and
 @ consumption models (compact JSON, NUL-terminated)
