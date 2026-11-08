@@ -72,7 +72,9 @@ The stock Telechips stack sends none of the EV parts. Two patches:
   `charging_contract` in the shape of `evnative/ioniq5-contracts.json`
   (model_id must match, at most 2000 bytes each). LeafiaEv reads it within
   15 s of it appearing or changing, keeps a copy (`ev-model.json`) so the
-  drive can go, and sends it with every update. A file holding `{}` goes
+  drive can go, and sends it with every update. Maps only takes the models
+  when CarPlay connects (checked on the car 2026-11-08), so reconnect CarPlay
+  after a new file. A file holding `{}` goes
   back to the built-in models. Logged as `model file used (...)` or `model
   file ignored (...): <reason>`. The library keeps both models in 2 KB
   buffers and its parser now covers all 18 send-list entries, so LeafiaEv
