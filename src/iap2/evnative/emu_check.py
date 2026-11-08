@@ -28,15 +28,19 @@ for i in range(relsz//8):
         mu.mem_write(B+off, struct.pack('<I', v+B))
 CTX=0x20000000; mu.mem_map(CTX, 0x60000)
 STK=0x30000000; mu.mem_map(STK, 0x10000)
-BUF=0x31000000; mu.mem_map(BUF, 0x1000)
+BUF=0x31000000; mu.mem_map(BUF, 0x4000)
 STOP=0x32000000; mu.mem_map(STOP, 0x1000)
 ITEM=0x33000000; mu.mem_map(ITEM, 0x1000)
+STR=0x34000000; mu.mem_map(STR, 0x10000)
 ITEMS=[]
 def set_items(items):
     """items: (id, iAP2 type, int value), as LeafiaEv puts them in the parcel"""
     ITEMS[:] = items
+    at = STR
     for i, (pid, typ, val) in enumerate(items):
-        mu.mem_write(ITEM + 32 * i, struct.pack('<IIIIi', 0, pid, typ, 1, val))
+        if isinstance(val, str):        # type 10: getItemString returns it
+            mu.mem_write(at, val.encode() + b'\0'); val = at; at += 0x1000
+        mu.mem_write(ITEM + 32 * i, struct.pack('<IIII', 0, pid, typ, 1) + struct.pack('<I', val & 0xffffffff))
 def ret(uc, r0=None):
     if r0 is not None: uc.reg_write(UC_ARM_REG_R0, r0)
     uc.reg_write(UC_ARM_REG_PC, uc.reg_read(UC_ARM_REG_LR))
@@ -64,6 +68,10 @@ def hook(uc, addr, size, _):
     elif a == 0xfd44: ret(uc, ITEM + 32 * uc.reg_read(UC_ARM_REG_R1))  # getObjItem(i)
     elif a == 0xfd50:                                             # Iap2ObjItem::getItemInt
         ret(uc, struct.unpack('<i', uc.mem_read(uc.reg_read(UC_ARM_REG_R0) + 16, 4))[0] & 0xffffffff)
+    elif a == 0xfed0:                                             # Iap2ObjItem::getItemString(int *len)
+        item = uc.reg_read(UC_ARM_REG_R0); sp_ = struct.unpack('<I', uc.mem_read(item + 16, 4))[0]
+        uc.mem_write(uc.reg_read(UC_ARM_REG_R1), struct.pack('<i', len(cstr(uc, sp_))))
+        ret(uc, sp_)
     elif 0xfc7c <= a < 0xffc0: print('unhandled plt', hex(a)); uc.emu_stop()
 mu.hook_add(UC_HOOK_CODE, hook, begin=B, end=B+0x40000)
 def call(fn, args, stack):
@@ -81,7 +89,7 @@ def parse(b):
 SPLAEN=0x1a3b4
 def build(table, count, gp):
     n = call(SPLAEN, (B+table, count, 0, 0), (CTX, 1, B+gp|1))
-    m = call(SPLAEN, (B+table, count, BUF, 0x400), (CTX, 0, B+gp|1))
+    m = call(SPLAEN, (B+table, count, BUF, 0x4000), (CTX, 0, B+gp|1))
     return n, m, parse(bytes(mu.mem_read(BUF, m)))
 which=('vinfo','send')
 if 'vinfo' in which:
@@ -116,13 +124,15 @@ if 'send' in which:
     sp_tbl = (struct.unpack('<I', mu.mem_read(B+0x14fc8,4))[0] + 0x14fba+4) & 0xffffffff
     sp_cnt = mu.mem_read(B+0x14fbc,1)[0]
     sp_gp = (struct.unpack('<I', mu.mem_read(B+0x14fc4,4))[0] + 0x14fb6+4 - 1) & 0xffffffff
-    assert sp_tbl == tbl and sp_cnt == 16 and sp_gp == gp, (hex(sp_tbl), sp_cnt, hex(sp_gp))
+    assert sp_tbl == tbl and sp_cnt == 18 and sp_gp == gp, (hex(sp_tbl), sp_cnt, hex(sp_gp))
     def setparam(items):
         set_items(items)
         n = call(0x1abd0, (CTX, 0x33000800, B+sp_tbl, sp_cnt), (B+sp_gp|1,))
         assert n, 'parser returned 0: no update would be sent'
+    CH, CO = bytes.fromhex(vals[26])[:-1].decode(), bytes.fromhex(vals[27])[:-1].decode()
+    MODELS = [(26, 10, CH), (27, 10, CO)]
     full = [(21, 6, 0), (22, 6, 41234), (23, 6, 64000), (24, 6, 64500),
-            (3, 5, 312), (11, 5, 312), (6, 9, 0), (15, 9, 0), (30, 5, 483)]
+            (3, 5, 312), (11, 5, 312), (6, 9, 0), (15, 9, 0), (30, 5, 483)] + MODELS
     setparam(full)
     out = dict(a101())
     want = {3: '%04x' % 312, 6: '00', 11: '%04x' % 312, 15: '00', 21: '%08x' % 0,
@@ -130,10 +140,19 @@ if 'send' in which:
     assert [p for p in out] == [3, 6, 11, 15, 21, 22, 23, 24, 30, 26, 27], out
     assert {k: out[k] for k in want} == want, out
     # no range from the car: battery only, range entries off again
-    setparam([(21, 6, 0), (22, 6, 9000), (23, 6, 64000), (24, 6, 14000)])
+    setparam([(21, 6, 0), (22, 6, 9000), (23, 6, 64000), (24, 6, 14000)] + MODELS)
     out = dict(a101())
     assert [p for p in out] == [21, 22, 23, 24, 26, 27], out
     assert out[24] == '%08x' % 14000, out
+    # an override model from the app replaces the default, at full length
+    big = json.loads(CO); big['vehicle_parameters']['note'] = 'x' * (2000 - len(CO) - 10)
+    big = json.dumps(big, separators=(',', ':')); assert len(big) <= 2000
+    setparam([(22, 6, 9000), (24, 6, 14000), (26, 10, CH), (27, 10, big)])
+    out = dict(a101())
+    assert bytes.fromhex(out[27])[:-1].decode() == big and bytes.fromhex(out[26])[:-1].decode() == CH
+    # an update without the models turns them off (so LeafiaEv always sends them)
+    setparam([(22, 6, 9000), (24, 6, 14000)])
+    assert [p for p in dict(a101())] == [22, 24]
     # the switched ones still go to the stock storage
     setparam([(4, 1, 1)] + full)
     out = dict(a101())

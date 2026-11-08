@@ -57,9 +57,29 @@ The stock Telechips stack sends none of the EV parts. Two patches:
   - 21 minimum 0 Wh,
   - with a range reading: 3 and 11 range (km), 6 and 15 range warning at
     20 % or less, 30 range at 100 % (range / SOC, from 20 %, at most 700 km).
-  A reading is sent when it changes, at least every 5 minutes, and a second
-  after the phone turns updates on. Each send is logged with tag `LeafiaEv`
-  (`sent true: soc/energy/range raw 47/7170/46 -> 14340 of 61021 Wh, ...`).
+  A reading is sent when it changes (at most once a minute, since Maps
+  recalculates the route on every update), at least every 5 minutes, and a
+  second after the phone turns updates on. Each check is logged with tag
+  `LeafiaEv` (`sent true: soc/energy/range raw 47/7170/46 -> ...`).
+- Trip log: every 15 s while the head unit is on, each changed reading
+  (time, SOC, energy, cluster range, odometer, charge state, climate power,
+  raw) goes into `ev-trips.csv` in Iap2ServerApp's files dir; at 2 MB it
+  moves to `ev-trips.1.csv`. No location. The kit copies both to
+  `LEAFIA/private/logs/ev/`; `src/iap2/ev-trips.py` turns them into Wh/km per
+  drive and per speed band.
+- Model override: `LEAFIA-EV-MODEL.json` at the top of a USB drive
+  (`/storage/usb0` or `usb1`), with `consumption_contract` and/or
+  `charging_contract` in the shape of `evnative/ioniq5-contracts.json`
+  (model_id must match, at most 2000 bytes each). LeafiaEv reads it within
+  15 s of it appearing or changing, keeps a copy (`ev-model.json`) so the
+  drive can go, and sends it with every update. A file holding `{}` goes
+  back to the built-in models. Logged as `model file used (...)` or `model
+  file ignored (...): <reason>`. The library keeps both models in 2 KB
+  buffers and its parser now covers all 18 send-list entries, so LeafiaEv
+  sends the models with every update.
+
+The two hook calls sit in their own catch-all, so if LeafiaEv ever failed to
+load on the unit, the stock iAP2 code would run on without it.
 
 Every EV field the library writes in the identification is also logged as an
 error-level line with tag `iAP2` (`Leafia EV: identification

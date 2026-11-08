@@ -7,7 +7,9 @@ usage: hooks.py <smali dir>
       Ev6BtTrigger.register call (at its :catchall_c9 label)
   Iap2HandleNoti.sendEventToNotiHandler: LeafiaEv.onNoti(what) first
 
-Each anchor must occur exactly once, so another build stops the script
+Both calls sit in their own catch-all, so if LeafiaEv ever fails to load
+(a verify error on the unit) the stock code runs on unharmed. Each anchor
+must occur exactly once, so another build stops the script
 instead of patching the wrong place. LeafiaEv also calls the synthetic
 accessors Iap2Service.access$200 (mLock), access$300 (mHandleIap2) and
 access$2800 (Iap2SendVehicleStatus); they are checked here too.
@@ -15,6 +17,12 @@ access$2800 (Iap2SendVehicleStatus); they are checked here too.
 import os, sys
 
 D = os.path.join(sys.argv[1], 'com', 'tcc', 'iap2server')
+
+
+def guarded(tag, call):
+    return ('    :leafia_%s_start\n    %s\n    :leafia_%s_end\n'
+            '    .catchall {:leafia_%s_start .. :leafia_%s_end} :leafia_%s_skip\n'
+            '    :leafia_%s_skip\n\n' % ((tag, call) + (tag,) * 5))
 
 
 def edit(name, anchor, add):
@@ -40,9 +48,9 @@ edit('Iap2Service.smali',
      '(Lcom/tcc/iap2server/Iap2Service;Landroid/content/BroadcastReceiver;)V\n'
      '    :try_end_c9\n    .catchall {:try_start_c4 .. :try_end_c9} :catchall_c9\n\n'
      '    .line 408\n    :catchall_c9\n',
-     '    invoke-static {p0}, Lcom/tcc/iap2server/LeafiaEv;->start(Lcom/tcc/iap2server/Iap2Service;)V\n\n')
+     guarded('start', 'invoke-static {p0}, Lcom/tcc/iap2server/LeafiaEv;->start(Lcom/tcc/iap2server/Iap2Service;)V'))
 edit('Iap2HandleNoti.smali',
      '.method public sendEventToNotiHandler(IIILjava/lang/Object;)V\n    .registers 11\n'
      '    .param p1, "what"    # I\n    .param p2, "arg1"    # I\n    .param p3, "arg2"    # I\n'
      '    .param p4, "obj"    # Ljava/lang/Object;\n\n    .prologue\n',
-     '    invoke-static {p1}, Lcom/tcc/iap2server/LeafiaEv;->onNoti(I)V\n\n')
+     guarded('noti', 'invoke-static {p1}, Lcom/tcc/iap2server/LeafiaEv;->onNoti(I)V'))

@@ -2,6 +2,7 @@
 # Rebuild the EV test patches for one car set:
 #   patches/<set>/Iap2ServerApp.bridge.lpd  upstream bridge build + ev_engine.py
 #                                           + smali/ (LeafiaEv) + hooks.py
+#                                           + LeafiaEvModels (ev_native.py --models-smali)
 #   patches/<set>/libiap2session.ev.lpd     evnative/ev_native.py on the stock library
 # Needs the car's stock Iap2ServerApp.odex and lib/libiap2session.so (Leafia
 # keeps the odex in /data/nemesis/backup/projection.tbt/ on the unit; a port
@@ -37,6 +38,7 @@ fetch smali-2.5.2.jar 9544299578b16f771d8aa8eaefe0d3718ca03478c16f3c356f2fcf1366
 python3 -I "$HERE/ev_engine.py" "$W/base.dex" "$W/ev.dex" --ev-status
 java -jar "$T/baksmali-2.5.2.jar" d -a 18 -j 1 "$W/ev.dex" -o "$W/smali"
 cp -R "$HERE/smali/." "$W/smali/"
+python3 -I "$HERE/evnative/ev_native.py" --models-smali "$W/smali/com/tcc/iap2server/LeafiaEvModels.smali"
 python3 -I "$HERE/hooks.py" "$W/smali"
 java -jar "$T/smali-2.5.2.jar" a -a 18 -j 1 "$W/smali" -o "$W/classes.dex"
 python3 -I "$HERE/evnative/ev_native.py" "$LIB" "$W/libiap2session.so"
