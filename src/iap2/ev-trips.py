@@ -7,8 +7,8 @@ usage: ev-trips.py <ev-trips.csv> [ev-trips.1.csv ...] [--odo-km-per-unit X]
 Each row is one changed reading, about every 15 s while the car is on:
 time, SOC (0.5 %), remaining energy (2 Wh steps), cluster range, odometer
 (raw), charge state, climate power (raw), whether CarPlay wanted updates.
-The odometer's raw unit is not confirmed: by default 0.1 mile (US cluster);
-pass --odo-km-per-unit 0.1 if it turns out to be 0.1 km.
+The odometer counts 0.1 km (2026-11-08: 77 units on a 4.7-mile drive on a
+US Ioniq 5 set to miles); --odo-km-per-unit overrides that.
 
 Rows are cut into drives (a gap over 5 minutes or energy going up ends one),
 each drive into 2-minute windows, and every window's energy and distance go
@@ -45,7 +45,7 @@ def drives(rs):
 
 def main():
     args = sys.argv[1:]
-    k = 0.1 * 1.609344
+    k = 0.1
     if '--odo-km-per-unit' in args:
         i = args.index('--odo-km-per-unit'); k = float(args[i + 1]); del args[i:i + 2]
     if not args:
