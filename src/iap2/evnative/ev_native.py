@@ -50,6 +50,11 @@ VALUES = dict(EV_DC_POWER_W=235000, EV_AC_POWER_W=10900)
 EV_NAME = 'Hyundai Ioniq 5'
 # charging (A101 param 26) and consumption (27) models, sent as compact JSON
 CONTRACTS = 'ioniq5-contracts.json'
+# Isaac's per-distance consumption values (172-258 Wh/km) predicted twice the
+# battery use of a 16-mile mixed trip on Ruben's US Ioniq 5 (2026-11-08: 10 %
+# predicted, 4-5 % used, about 110-125 Wh/km; the car's own navigation range
+# also implies about 120 Wh/km). Scaled by this until there is more data.
+CONSUMPTION_SCALE = 0.6
 
 # stock addresses
 VINFO_IDEN_TABLE = 0x30cec      # idenInfoVehicleInfoGroupList, 5 entries
@@ -97,6 +102,9 @@ def asciz(label, text):
 def build_code(tmp):
     o, elf = os.path.join(tmp, 'ev.o'), os.path.join(tmp, 'ev.elf')
     c = json.load(open(os.path.join(HERE, CONTRACTS)))
+    vp = c['consumption_contract']['vehicle_parameters']
+    vp['vehicle_consumption_values_wh_per_m'] = [
+        round(v * CONSUMPTION_SCALE, 4) for v in vp['vehicle_consumption_values_wh_per_m']]
     compact = lambda k: json.dumps(c[k], separators=(',', ':'))
     # json.dumps never writes a backslash or a raw quote-free string here: keys and
     # numbers only; .ascii needs the quotes escaped

@@ -110,6 +110,8 @@ if 'send' in which:
         raw = bytes.fromhex(vals[pid])
         assert raw.endswith(b'\0'), pid
         assert json.loads(raw[:-1])['model_id'] == mid, pid
+    cons = json.loads(bytes.fromhex(vals[27])[:-1])['vehicle_parameters']['vehicle_consumption_values_wh_per_m']
+    assert cons[0] == 0.1352 and len(cons) == 10, cons   # Isaac's 0.2254 x 0.6
     # the stock parser, as iAP2SessCtrlUpdateVehicleStatus calls it
     sp_tbl = (struct.unpack('<I', mu.mem_read(B+0x14fc8,4))[0] + 0x14fba+4) & 0xffffffff
     sp_cnt = mu.mem_read(B+0x14fbc,1)[0]

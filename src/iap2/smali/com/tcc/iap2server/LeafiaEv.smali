@@ -15,7 +15,8 @@
 # DisplayedBatteryPercentage (% x 1000); with a range: 3 Range and 11
 # RangeElectric (km), 6/15 range warnings (at 20 % or less), 30
 # MaxRangeElectric (range scaled to 100 %, from 20 % up).
-# Checked every 30 s, sent when a reading changed or every 5 min.
+# Checked every 30 s (each check logged), sent when a reading changed or
+# every 5 min.
 #
 # Hooks (src/iap2/hooks.py): Iap2Service.onCreate -> start(this),
 # Iap2HandleNoti.sendEventToNotiHandler -> onNoti(what).
@@ -327,6 +328,11 @@
     const-wide/32 v12, 0x493e0
     cmp-long v11, v18, v12
     if-gez v11, :send
+    const-string v12, "unchanged, not sent: soc/energy/range raw "
+    invoke-virtual {v12, v10}, Ljava/lang/String;->concat(Ljava/lang/String;)Ljava/lang/String;
+    move-result-object v11
+    const-string v12, "LeafiaEv"
+    invoke-static {v12, v11}, Landroid/util/Log;->i(Ljava/lang/String;Ljava/lang/String;)I
     return-void
 
     :send

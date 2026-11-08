@@ -69,7 +69,9 @@ the library's own `iAP2InterfaceLogError`, so a capture shows whether the
 fields reached the packet without turning on the library's debug logs.
 
 **Test build:** the charging and consumption models are Isaac Wisdom's
-estimates, the car name and charging power are fixed, and the range unit is
+estimates, with the per-distance consumption values scaled by 0.6
+(`CONSUMPTION_SCALE` in `evnative/ev_native.py`: on a 16-mile mixed trip his
+values predicted twice the battery use), the car name and charging power are fixed, and the range unit is
 assumed to be miles (US cars). Tested on a car with fixed values only
 (2026-11-08, US Ioniq 5: Maps offered the car under Vehicles and planned
 charging stops); the live values are not yet car-tested.
