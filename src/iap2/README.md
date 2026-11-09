@@ -57,8 +57,9 @@ The stock Telechips stack sends none of the EV parts. Two patches:
   - 21 minimum 0 Wh,
   - with a range reading: 3 and 11 range (km), 6 and 15 range warning at
     20 % or less, 30 range at 100 % (range / SOC, from 20 %, at most 700 km).
-  A reading is sent when it changes (at most once a minute, since Maps
-  recalculates the route on every update), at least every 5 minutes, and a
+  A reading is sent when it changes (at most every 30 s, since Maps
+  recalculates the route on every update; with once a minute the iPhone
+  once reported that the car stopped sending data), at least every minute, and a
   second after the phone turns updates on. Each check is logged with tag
   `LeafiaEv` (`sent true: soc/energy/range raw 47/7170/46 -> ...`).
 - Trip log: every 15 s while the head unit is on, each changed reading

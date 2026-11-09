@@ -339,7 +339,7 @@
     const/4 v8, 0x1
     :no_warning
 
-    # send when a reading changed, or every 5 minutes
+    # send when a reading changed, or every minute
     new-instance v11, Ljava/lang/StringBuilder;
     invoke-direct {v11}, Ljava/lang/StringBuilder;-><init>()V
     invoke-virtual {v11, v0}, Ljava/lang/StringBuilder;->append(I)Ljava/lang/StringBuilder;
@@ -358,7 +358,7 @@
     if-eqz v11, :changed
     sget-wide v18, Lcom/tcc/iap2server/LeafiaEv;->sLastSent:J
     sub-long v18, v16, v18
-    const-wide/32 v12, 0x493e0
+    const-wide/32 v12, 0xea60  # 60 s
     cmp-long v11, v18, v12
     if-gez v11, :send
     const-string v12, "unchanged, not sent: soc/energy/range raw "
@@ -369,16 +369,17 @@
     return-void
 
     # changed: right away after a start or a new model (sLast null), else at
-    # most once a minute (Maps recalculates the route on every update)
+    # most every 30 s (Maps recalculates the route on every update; once a
+    # minute was slow enough for the phone to report the car stopped sending)
     :changed
     sget-object v11, Lcom/tcc/iap2server/LeafiaEv;->sLast:Ljava/lang/String;
     if-eqz v11, :send
     sget-wide v18, Lcom/tcc/iap2server/LeafiaEv;->sLastSent:J
     sub-long v18, v16, v18
-    const-wide/32 v12, 0xea60
+    const-wide/16 v12, 0x7530
     cmp-long v11, v18, v12
     if-gez v11, :send
-    const-string v12, "changed, sent within a minute: soc/energy/range raw "
+    const-string v12, "changed, sent within 30 s: soc/energy/range raw "
     invoke-virtual {v12, v10}, Ljava/lang/String;->concat(Ljava/lang/String;)Ljava/lang/String;
     move-result-object v11
     const-string v12, "LeafiaEv"
