@@ -7,6 +7,20 @@ if ! restore_all; then
     log "keeping $BACKUP_DIR"
     exit 1
 fi
+if [ -s "$BACKUP_DIR/libiap2session.so" ]; then
+    if ! sys_rw; then
+        log "FAIL: remount /system rw"
+        log "keeping $BACKUP_DIR"
+        exit 1
+    fi
+    if ! restore_iaplib; then
+        sys_ro
+        log "keeping $BACKUP_DIR"
+        exit 1
+    fi
+    sync
+    sys_ro
+fi
 if ! restore_core; then
     log "keeping $BACKUP_DIR"
     exit 1

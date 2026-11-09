@@ -17,14 +17,16 @@
 #     logs/              our package's install logs
 #   private/         only send privately, and only when a maintainer asks
 #     logs/              Android and kernel logs, NEMESIS logs, crash dumps,
-#                        network state: can hold phone names or Bluetooth addresses
+#                        network state: can hold phone names or Bluetooth addresses;
+#                        ev/ the EV test build's trip log (odometer, battery)
 #     stock/             stock framework, CarPlay/projection apps and libraries:
 #                        Hyundai/Kia files, used to port the package to this car
 #     keys/              firmware key files: never post these anywhere
 #
 # From /data only NEMESIS's own folder, the crash records (tombstones, ANR
-# traces, dropbox crash entries), the hotspot address leases and the names of
-# system apps' entries in the Dalvik cache are read.
+# traces, dropbox crash entries), the hotspot address leases, the names of
+# system apps' entries in the Dalvik cache and the EV test build's trip log
+# (/data/data/com.tcc.iap2server/files/ev-*) are read.
 # Never collected: accounts, paired phone data, Wi-Fi passwords, the vehicle
 # security partition, VIN or serial numbers.
 export PATH=/sbin:/vendor/bin:/system/sbin:/system/bin:/system/xbin
@@ -304,7 +306,13 @@ for _f in $N/logs/* $N/logs/*/*; do
     [ "$_n" != "$_rel" ] && _n="${_n}_${_rel#*/}"
     copy_file "$_f" "$LOGS/nemesis-logs/$_n"
 done
-logcat -d -v time -s TccCarPlay:V CarPlay_:V DiPOManager:V Iap2Server:V iAP2:V GalReceiver:V GPM:V \
+# EV test build: trip log and saved model file (battery, range, odometer and
+# charge state readings with times; no location)
+_ev=/data/data/com.tcc.iap2server/files
+for _n in ev-trips.csv ev-trips.1.csv ev-model.json; do
+    [ -f "$_ev/$_n" ] && { mkdir -p "$LOGS/ev"; copy_file "$_ev/$_n" "$LOGS/ev/$_n"; }
+done
+logcat -d -v time -s TccCarPlay:V CarPlay_:V DiPOManager:V Iap2Server:V iAP2:V LeafiaEv:V GalReceiver:V GPM:V \
     PhoneProjection:V BTCMStateMachine:I EV6AAC:V AndroidRuntime:V DEBUG:V ActivityManager:W \
     PackageManager:W > "$LOGS/logcat-projection.txt" 2>&1
 logcat -d -v time '*:W' > "$LOGS/logcat-warnings.txt" 2>&1
