@@ -1,0 +1,31 @@
+{
+  "id": "carplay-tweaks",
+  "name": "CarPlay tweaks (Ioniq 5 US)",
+  "version": "0.1.0",
+  "hmgapi": ">=1.1.0-beta.1",
+  "authors": [
+    "samrum"
+  ],
+  "license": "AGPL-3.0",
+  "description": "The Wi-Fi client with a Wi-Fi screen that keeps wireless CarPlay/Android Auto: opening it no longer drops the phone, switching the client on and off no longer ends in Error, and the phone reconnects when the client goes off.",
+  "requires": [
+    "wireless-carplay-aa"
+  ],
+  "system": [
+    {
+      "model": [
+        "NEEV"
+      ],
+      "region": "USA",
+      "firmware": "260507"
+    }
+  ],
+  "wifi": {
+    "client": true
+  },
+  "logs": {
+    "tags": [
+      "LeafiaWifi"
+    ]
+  }
+}

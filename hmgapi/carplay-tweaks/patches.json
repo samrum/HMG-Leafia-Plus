@@ -1,0 +1,15 @@
+{
+  "cars": {
+    "NEEV.USA.": "neev"
+  },
+  "stock": "patches/{set}/stock",
+  "changes": [
+    {
+      "type": "app",
+      "path": "/system/app/HKMC_WifiSettings.apk",
+      "delta": [
+        "files/HKMC_WifiSettings.wifi.164039dd.lpd"
+      ]
+    }
+  ]
+}
